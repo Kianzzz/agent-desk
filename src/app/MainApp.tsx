@@ -1,6 +1,7 @@
 import { BarChart3, Blocks, HardDrive, LayoutDashboard, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { onEvent } from "../api";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { inTauri, onEvent } from "../api";
 import { bytes } from "../lib/format";
 import { useDisk, useSecurity, useSettings } from "../lib/hooks";
 import { sumSafe } from "../lib/disk";
@@ -40,14 +41,16 @@ export function MainApp() {
 
   useEffect(() => onEvent<string>("navigate", (p) => NAV.some((n) => n.id === p) && setPage(p as Page)), []);
 
+  useWindowDrag();
+
   const highs = security?.findings.filter((f) => f.severity === "high" && !settings?.ignoredFindings.includes(f.id)).length ?? 0;
   const safe = disk ? sumSafe(disk.locations) : 0;
 
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="sidebar-drag" data-tauri-drag-region />
-        <div className="brand" data-tauri-drag-region>
+        <div className="sidebar-drag" />
+        <div className="brand">
           <Logo size={18} />
           Agent Desk
         </div>
@@ -77,4 +80,25 @@ export function MainApp() {
       </main>
     </div>
   );
+}
+
+/** 页头和左侧导航的空白处都能拖动窗口，双击放大或还原（跟系统标题栏一样）。
+ *  按钮、开关、输入框这些可点的东西照常响应点击。 */
+const DRAG_AREAS = ".page-head, .sidebar";
+const INTERACTIVE = "button, a, input, select, textarea, label, [role=button], [role=switch], [role=tab], [role=tablist], [role=radio]";
+
+function useWindowDrag() {
+  useEffect(() => {
+    if (!inTauri) return;
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const t = e.target as HTMLElement | null;
+      if (!t?.closest(DRAG_AREAS) || t.closest(INTERACTIVE)) return;
+      const win = getCurrentWindow();
+      if (e.detail === 2) win.toggleMaximize().catch(() => {});
+      else win.startDragging().catch(() => {});
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
 }
