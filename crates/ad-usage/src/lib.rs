@@ -4,6 +4,8 @@
 //! - Claude Code：`~/.claude/projects/**/*.jsonl`（含 `subagents/`），以及 `~/.config/claude/projects`
 //! - Codex：`~/.codex/sessions/**/rollout-*.jsonl`（以及 `~/.codex/archived_sessions`）
 //! - Gemini CLI：`~/.gemini/tmp/*/chats/session-*.json`
+//! - 其余工具（Grok、OpenCode、Kilo、Qwen、Copilot、Cline、Roo、Kimi、Droid、Amp、Pi、OpenClaw、
+//!   CodeBuddy、Crush、Goose）的数据位置见各自的模块和 `tools.rs`
 //!
 //! 公共类型是和界面约定好的接口（见 docs/CONTRACT.md），改动前先同步界面。
 
@@ -11,15 +13,29 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod aggregate;
+mod amp;
 mod cache;
 mod claude;
+mod cline;
+mod codebuddy;
 mod codex;
+mod copilot;
+mod crush;
 mod discover;
+mod droid;
 mod engine;
 mod gemini;
+mod goose;
+mod grok;
+mod kimi;
+mod opencode;
+mod pi;
 mod pricing;
+mod qwen;
 mod record;
 mod scan;
+mod sqlite;
+mod tools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +43,29 @@ pub enum Tool {
     Claude,
     Codex,
     Gemini,
+    /// Grok Build（xAI 官方）和社区版 grok-cli
+    Grok,
+    /// OpenCode（新旧存储）
+    Opencode,
+    /// Kilo CLI 和 Kilo Code 扩展
+    Kilo,
+    Qwen,
+    /// GitHub Copilot CLI
+    Copilot,
+    /// Cline 扩展和 Cline CLI
+    Cline,
+    /// Roo Code 扩展
+    Roo,
+    /// Kimi CLI 和 Kimi Code
+    Kimi,
+    /// Factory Droid
+    Droid,
+    Amp,
+    Pi,
+    Openclaw,
+    Codebuddy,
+    Crush,
+    Goose,
 }
 
 /// 各家口径统一后的 token 数。

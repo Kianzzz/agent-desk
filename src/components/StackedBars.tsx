@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { Tool } from "../types";
 import { money, shortDate, TOOL_LABEL, tokens as fmtTokens, toolVar, type MoneyFmt } from "../lib/format";
-import type { DayPoint } from "../lib/usage";
+import type { DayPoint, Series } from "../lib/usage";
 
 /** 0 到 max 之间取整齐的刻度。 */
 function niceTicks(max: number, count = 4): number[] {
@@ -29,7 +28,7 @@ export function StackedBars({
   onPick,
 }: {
   points: DayPoint[];
-  tools: Tool[];
+  tools: Series[];
   fmt?: MoneyFmt;
   height?: number;
   /** 柱子高度按 token 还是按费用 */
@@ -54,7 +53,7 @@ export function StackedBars({
     };
   }, []);
 
-  const val = (p: DayPoint, t?: Tool) =>
+  const val = (p: DayPoint, t?: Series) =>
     metric === "tokens" ? (t ? (p.tokensByTool[t] ?? 0) : p.tokens) : t ? (p.byTool[t] ?? 0) : p.total;
   const tick = (v: number) => (metric === "tokens" ? fmtTokens(v) : "$" + (v >= 1000 ? `${v / 1000}k` : v));
   const left = 52;
@@ -154,7 +153,7 @@ export function StackedBars({
   );
 }
 
-export function ToolLegend({ tools }: { tools: Tool[] }) {
+export function ToolLegend({ tools }: { tools: Series[] }) {
   return (
     <div className="legend">
       {tools.map((t) => (

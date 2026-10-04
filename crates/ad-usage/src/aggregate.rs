@@ -7,7 +7,7 @@ use chrono::{DateTime, Local, SecondsFormat, TimeZone};
 
 use crate::cache::Files;
 use crate::pricing::{ModelPrice, Pricing};
-use crate::record::{FileEntry, QuotaObs, Rec};
+use crate::record::{FileEntry, QuotaObs, Rec, COST_UNITS_PER_USD};
 use crate::{
     ActiveBlock, DailyModelRow, ProjectRow, QuotaWindow, SessionRow, SourceStatus, TokenCounts,
     Tool, UsageSnapshot,
@@ -296,7 +296,12 @@ pub(crate) fn build(
             let Some(&gid) = local_models[ei].get(r.model as usize) else {
                 continue;
             };
-            let cost = prices[gid].map(|p| p.cost(r));
+            // 工具自己记了费用就用它，否则按价格表折算
+            let cost = if r.known_cost > 0 {
+                Some(r.known_cost as f64 / COST_UNITS_PER_USD)
+            } else {
+                prices[gid].map(|p| p.cost(r))
+            };
             if cost.is_none() {
                 unpriced.insert(model_names[gid]);
             }

@@ -10,8 +10,7 @@ pub(crate) const FLAG_FAST: u8 = 1;
 pub(crate) const FLAG_PRIORITY: u8 = 2;
 
 /// 一次计费请求。缓存里序列化成数组以减小体积。
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(from = "RecRepr", into = "RecRepr")]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct Rec {
     /// Unix 毫秒
     pub ts: i64,
@@ -28,43 +27,78 @@ pub(crate) struct Rec {
     pub cache_write_1h: u64,
     pub reasoning: u64,
     pub flags: u8,
+    /// 工具自己记下的费用，单位是 1e-10 美元；0 表示没有，按价格表折算
+    pub known_cost: u64,
 }
 
-type RecRepr = (i64, u64, u32, u32, u64, u64, u64, u64, u64, u64, u8);
-
-impl From<RecRepr> for Rec {
-    fn from(r: RecRepr) -> Self {
-        Rec {
-            ts: r.0,
-            key: r.1,
-            model: r.2,
-            session: r.3,
-            input: r.4,
-            output: r.5,
-            cache_read: r.6,
-            cache_write_5m: r.7,
-            cache_write_1h: r.8,
-            reasoning: r.9,
-            flags: r.10,
-        }
+/// 美元 → `Rec::known_cost` 的单位（负数、非有限值当作没有）
+pub(crate) fn usd_to_cost(usd: f64) -> u64 {
+    if usd.is_finite() && usd > 0.0 {
+        (usd * COST_UNITS_PER_USD).round() as u64
+    } else {
+        0
     }
 }
 
-impl From<Rec> for RecRepr {
-    fn from(r: Rec) -> Self {
-        (
-            r.ts,
-            r.key,
-            r.model,
-            r.session,
-            r.input,
-            r.output,
-            r.cache_read,
-            r.cache_write_5m,
-            r.cache_write_1h,
-            r.reasoning,
-            r.flags,
-        )
+pub(crate) const COST_UNITS_PER_USD: f64 = 1e10;
+
+// 缓存格式：前 11 项和旧版本一样；有已知费用时追加第 12 项。旧缓存照样能读。
+impl Serialize for Rec {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeTuple;
+        let n = if self.known_cost > 0 { 12 } else { 11 };
+        let mut t = s.serialize_tuple(n)?;
+        t.serialize_element(&self.ts)?;
+        t.serialize_element(&self.key)?;
+        t.serialize_element(&self.model)?;
+        t.serialize_element(&self.session)?;
+        t.serialize_element(&self.input)?;
+        t.serialize_element(&self.output)?;
+        t.serialize_element(&self.cache_read)?;
+        t.serialize_element(&self.cache_write_5m)?;
+        t.serialize_element(&self.cache_write_1h)?;
+        t.serialize_element(&self.reasoning)?;
+        t.serialize_element(&self.flags)?;
+        if self.known_cost > 0 {
+            t.serialize_element(&self.known_cost)?;
+        }
+        t.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Rec {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = Rec;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("11 或 12 项的数组")
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut a: A) -> Result<Rec, A::Error> {
+                use serde::de::Error;
+                macro_rules! next {
+                    ($i:expr) => {
+                        a.next_element()?
+                            .ok_or_else(|| A::Error::invalid_length($i, &self))?
+                    };
+                }
+                Ok(Rec {
+                    ts: next!(0),
+                    key: next!(1),
+                    model: next!(2),
+                    session: next!(3),
+                    input: next!(4),
+                    output: next!(5),
+                    cache_read: next!(6),
+                    cache_write_5m: next!(7),
+                    cache_write_1h: next!(8),
+                    reasoning: next!(9),
+                    flags: next!(10),
+                    known_cost: a.next_element()?.unwrap_or(0),
+                })
+            }
+        }
+        d.deserialize_seq(V)
     }
 }
 
@@ -275,6 +309,66 @@ pub(crate) fn parse_ts(s: &str) -> Option<i64> {
         .map(|d| d.timestamp_millis())
 }
 
+/// 各家时间字段的写法不一：RFC 3339、`2026-10-01 12:00:00`（按 UTC）、秒或毫秒数字。统一成 Unix 毫秒。
+pub(crate) fn parse_time_str(s: &str) -> Option<i64> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    if let Some(ms) = parse_ts(s) {
+        return Some(ms);
+    }
+    for fmt in ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f"] {
+        if let Ok(d) = chrono::NaiveDateTime::parse_from_str(s, fmt) {
+            return Some(d.and_utc().timestamp_millis());
+        }
+    }
+    s.parse::<f64>().ok().and_then(num_to_ms)
+}
+
+/// 数字时间：大于 1e11 当毫秒（1973 年以后的毫秒数），否则当秒。
+pub(crate) fn num_to_ms(n: f64) -> Option<i64> {
+    if !n.is_finite() || n <= 0.0 {
+        return None;
+    }
+    Some(if n > 1e14 {
+        // 微秒
+        (n / 1000.0) as i64
+    } else if n > 1e11 {
+        n as i64
+    } else {
+        (n * 1000.0) as i64
+    })
+}
+
+pub(crate) fn parse_time_value(v: &serde_json::Value) -> Option<i64> {
+    match v {
+        serde_json::Value::Number(n) => n.as_f64().and_then(num_to_ms),
+        serde_json::Value::String(s) => parse_time_str(s),
+        _ => None,
+    }
+}
+
+/// `%2FUsers%2Fx` → `/Users/x`（解不出来的字节原样保留）
+pub(crate) fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            let hex = |c: u8| (c as char).to_digit(16);
+            if let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2])) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// `[文字](链接)` → `文字`，避免标题被长路径占满。
 fn strip_md_links(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -317,6 +411,24 @@ pub(crate) fn clean_title(s: &str) -> Option<String> {
     Some(collapsed.chars().take(80).collect())
 }
 
+/// 用户消息内容（字符串，或带 `text` 字段的片段数组）里第一段像用户输入的文字 → 标题
+pub(crate) fn first_text_title(v: &serde_json::Value) -> Option<String> {
+    let usable = |s: &str| {
+        let t = s.trim_start();
+        (!t.is_empty() && !starts_with_tag(t))
+            .then(|| clean_title(t))
+            .flatten()
+    };
+    match v {
+        serde_json::Value::String(s) => usable(s),
+        serde_json::Value::Array(items) => items
+            .iter()
+            .filter_map(|i| i.get("text").and_then(serde_json::Value::as_str))
+            .find_map(usable),
+        _ => None,
+    }
+}
+
 /// 以 `<标签…>` 开头的文本（系统注入的提示、命令输出、任务通知等），不当作用户输入。
 pub(crate) fn starts_with_tag(s: &str) -> bool {
     let Some(rest) = s.strip_prefix('<') else {
@@ -338,6 +450,39 @@ pub(crate) fn starts_with_tag(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rec_cache_format_is_backward_compatible() {
+        // 旧版本写的 11 项数组照样能读，已知费用为 0
+        let old: Rec = serde_json::from_str("[1,2,3,4,5,6,7,8,9,10,1]").unwrap();
+        assert_eq!((old.ts, old.flags, old.known_cost), (1, 1, 0));
+        assert_eq!(
+            serde_json::to_string(&old).unwrap(),
+            "[1,2,3,4,5,6,7,8,9,10,1]"
+        );
+        let with_cost = Rec {
+            known_cost: 123,
+            ..old
+        };
+        let text = serde_json::to_string(&with_cost).unwrap();
+        assert_eq!(text, "[1,2,3,4,5,6,7,8,9,10,1,123]");
+        assert_eq!(serde_json::from_str::<Rec>(&text).unwrap(), with_cost);
+        assert!(serde_json::from_str::<Rec>("[1,2,3]").is_err());
+        assert_eq!(usd_to_cost(0.0123), 123_000_000);
+        assert_eq!(usd_to_cost(-1.0), 0);
+        assert_eq!(usd_to_cost(f64::NAN), 0);
+    }
+
+    #[test]
+    fn time_and_decode_helpers() {
+        let iso = parse_time_str("2026-10-01T12:00:00Z").unwrap();
+        assert_eq!(parse_time_str("2026-10-01 12:00:00"), Some(iso));
+        assert_eq!(parse_time_str("1790000000"), Some(1_790_000_000_000));
+        assert_eq!(num_to_ms(1_790_000_000_123.0), Some(1_790_000_000_123));
+        assert_eq!(num_to_ms(1_770_983_426.42), Some(1_770_983_426_420));
+        assert_eq!(parse_time_str(""), None);
+        assert_eq!(percent_decode("%2FUsers%2Fa%20b%zz"), "/Users/a b%zz");
+    }
 
     #[test]
     fn titles() {

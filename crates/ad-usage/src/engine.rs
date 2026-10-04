@@ -9,10 +9,10 @@ use anyhow::Context;
 use rayon::prelude::*;
 
 use crate::cache::{self, Files};
-use crate::discover::{self, Found};
+use crate::discover::{self, Ctx, Found, Kind};
 use crate::pricing::{self, Pricing};
 use crate::record::{CodexState, FileEntry, Resume};
-use crate::{aggregate, claude, codex, gemini, scan, Tool, UsageSnapshot};
+use crate::{aggregate, claude, codex, gemini, scan, tools, Tool, UsageSnapshot};
 
 /// 文件头指纹最多取这么多字节
 const HEAD_FINGERPRINT: u64 = 4096;
@@ -92,17 +92,25 @@ fn parse_jsonl(f: &Found, prev: Option<&FileEntry>) -> io::Result<FileEntry> {
 
 fn run_task(t: Task, gemini_hashes: &HashMap<String, String>) -> Outcome {
     let Task { found: f, prev } = t;
-    let result = match f.tool {
-        Tool::Gemini => {
-            let mut e = FileEntry::new(
-                f.tool,
-                f.path.to_string_lossy().into_owned(),
-                f.size,
-                f.mtime_ns,
-            );
-            gemini::parse(&f.path, &mut e, f.gemini_project.clone(), gemini_hashes).map(|_| e)
+    let fresh = || {
+        FileEntry::new(
+            f.tool,
+            f.path.to_string_lossy().into_owned(),
+            f.size,
+            f.mtime_ns,
+        )
+    };
+    let result = match f.kind {
+        Kind::Gemini => {
+            let mut e = fresh();
+            gemini::parse(&f.path, &mut e, f.project.clone(), gemini_hashes).map(|_| e)
         }
-        Tool::Claude | Tool::Codex => parse_jsonl(&f, prev.as_ref()),
+        Kind::Claude | Kind::Codex => parse_jsonl(&f, prev.as_ref()),
+        // 其余工具：文件变了就整份重读
+        _ => {
+            let mut e = fresh();
+            tools::parse(&f, &mut e).map(|_| e)
+        }
     };
     match result {
         Ok(e) => Outcome::Parsed(e),
@@ -128,7 +136,7 @@ pub(crate) fn refresh(
     let files = st.files.get_or_insert_with(|| cache::load(&cache_path));
     let pricing = st.pricing.get_or_insert_with(|| pricing::load(state_dir));
 
-    let disc = discover::discover(home);
+    let disc = discover::discover(&Ctx::from_process(home));
     let mut present: HashMap<Tool, u32> = HashMap::new();
     let mut seen: HashSet<String> = HashSet::with_capacity(disc.files.len());
     let mut tasks = Vec::new();
@@ -222,10 +230,11 @@ mod tests {
         let md = std::fs::metadata(path).unwrap();
         Found {
             tool,
+            kind: Kind::Codex,
             path: path.to_path_buf(),
             size: md.len(),
             mtime_ns: 1,
-            gemini_project: None,
+            project: None,
         }
     }
 

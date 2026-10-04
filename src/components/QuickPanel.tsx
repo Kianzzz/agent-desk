@@ -3,7 +3,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { addDays, ago, localDate, money, TOOL_LABEL, tokens, toolVar } from "../lib/format";
 import { useAccounts, useTick, useUsage } from "../lib/hooks";
-import { byTool, rowsInRange, todayAndYesterday, totalTokens } from "../lib/usage";
+import { byTool, rowsInRange, todayAndYesterday, totalTokens, withUsageOnly } from "../lib/usage";
 import { QuotaRow } from "./Quota";
 import { Spinner } from "./ui";
 
@@ -41,7 +41,7 @@ export function QuickPanel({ onOpen }: { onOpen: (page?: string) => void }) {
   const { today, todayRows } = todayAndYesterday(snap);
   const todayByTool = byTool(todayRows);
   const recent = new Set(rowsInRange(snap, addDays(localDate(), -29)).map((r) => r.tool));
-  const shown = (accounts ?? []).filter((a) => a.loggedIn);
+  const shown = withUsageOnly(accounts, recent).filter((a) => a.loggedIn);
 
   return (
     <>

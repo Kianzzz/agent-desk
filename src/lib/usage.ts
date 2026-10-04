@@ -1,4 +1,4 @@
-import type { DailyModelRow, TokenCounts, Tool, UsageSnapshot } from "../types";
+import type { Account, DailyModelRow, TokenCounts, Tool, UsageSnapshot } from "../types";
 import { addDays, localDate, TOOL_ORDER } from "./format";
 
 export const emptyTokens = (): TokenCounts => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 });
@@ -65,14 +65,17 @@ export function byModel(rows: DailyModelRow[]): ModelTotals[] {
   return [...m.values()].sort((a, b) => b.cost - a.cost || totalTokens(b.tokens) - totalTokens(a.tokens));
 }
 
+/** 图表里的一个系列：某个工具，或者合并起来的「其他」。 */
+export type Series = Tool | "other";
+
 export interface DayPoint {
   date: string;
   /** 费用合计（美元） */
   total: number;
-  byTool: Partial<Record<Tool, number>>;
+  byTool: Partial<Record<Series, number>>;
   /** token 合计 */
   tokens: number;
-  tokensByTool: Partial<Record<Tool, number>>;
+  tokensByTool: Partial<Record<Series, number>>;
 }
 
 /** 连续的日期序列（没用量的日子补 0）。 */
@@ -113,4 +116,33 @@ export function todayAndYesterday(snap: UsageSnapshot) {
 export function monthRows(snap: UsageSnapshot) {
   const prefix = localDate().slice(0, 7);
   return snap.days.filter((d) => d.date.startsWith(prefix));
+}
+
+/** 工具超过 max 个时，按 token 保留前 max-1 个，其余合并成「其他」，免得颜色不够、图例太长。 */
+export function foldSeries(points: DayPoint[], tools: Tool[], max = 6): { points: DayPoint[]; series: Series[] } {
+  if (tools.length <= max) return { points, series: tools };
+  const sum = (t: Tool) => points.reduce((a, p) => a + (p.tokensByTool[t] ?? 0), 0);
+  const keep = new Set([...tools].sort((a, b) => sum(b) - sum(a)).slice(0, max - 1));
+  const folded = points.map((p) => {
+    const byTool: Partial<Record<Series, number>> = {};
+    const tokensByTool: Partial<Record<Series, number>> = {};
+    for (const t of tools) {
+      const k: Series = keep.has(t) ? t : "other";
+      if (p.byTool[t]) byTool[k] = (byTool[k] ?? 0) + p.byTool[t]!;
+      if (p.tokensByTool[t]) tokensByTool[k] = (tokensByTool[k] ?? 0) + p.tokensByTool[t]!;
+    }
+    return { ...p, byTool, tokensByTool };
+  });
+  return { points: folded, series: [...tools.filter((t) => keep.has(t)), "other"] };
+}
+
+/** 有用量、但账号模块没覆盖到的工具，补一条「只有用量」的账号，好让它也有一张卡片。 */
+export function withUsageOnly(accounts: Account[] | null, tools: Iterable<Tool>): Account[] {
+  const list = [...(accounts ?? [])];
+  for (const t of tools) {
+    if (!list.some((a) => a.tool === t)) {
+      list.push({ tool: t, loggedIn: true, loginKind: null, plan: null, windows: [], quotaSource: null, hint: "这个工具不在本机记录账号等级和额度" });
+    }
+  }
+  return list.sort((a, b) => TOOL_ORDER.indexOf(a.tool) - TOOL_ORDER.indexOf(b.tool));
 }

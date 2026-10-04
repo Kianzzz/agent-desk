@@ -1,0 +1,6 @@
+default_model = "kfc"
+
+[models.kfc]
+provider = "managed:kimi-code"
+model = "kimi-for-coding"
+max_context_size = 262144

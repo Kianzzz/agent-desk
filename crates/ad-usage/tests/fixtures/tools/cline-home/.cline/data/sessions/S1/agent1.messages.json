@@ -1,0 +1,1 @@
+{"version": 1, "agent": "subagent", "sessionId": "S1__agent1", "messages": [{"id": "msg_b_1", "role": "assistant", "ts": 1789000003000, "metrics": {"inputTokens": 500, "outputTokens": 40, "cacheReadTokens": 0, "cacheWriteTokens": 0}}]}

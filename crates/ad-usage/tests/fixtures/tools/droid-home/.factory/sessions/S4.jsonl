@@ -1,0 +1,3 @@
+{"type":"session_start","id":"S4","title":"OpenAI 会话","owner":"user1"}
+{"type":"message","id":"x1","timestamp":"2026-09-03T09:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"你好"}]}}
+{"type":"message","id":"x2","timestamp":"2026-09-03T09:00:03.000Z","message":{"role":"assistant","content":[{"type":"text","text":"你好！"}]}}

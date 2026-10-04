@@ -1,0 +1,1 @@
+{"cwd":"/Users/test/qwen_proj","version":"0.14.2","gitBranch":"main","uuid":"s1","parentUuid":null,"sessionId":"q1","timestamp":"2026-09-10T01:01:30.000Z","type":"assistant","isSidechain":true,"agentId":"a1","agentName":"explore","message":{"role":"model","parts":[]},"usageMetadata":{"promptTokenCount":500,"candidatesTokenCount":20,"totalTokenCount":520}}

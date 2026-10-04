@@ -1,0 +1,1 @@
+[{"id": "1764899999000", "ts": 1764900040000, "task": "Fix bug", "tokensIn": 947, "tokensOut": 1560, "cacheWrites": 17000, "cacheReads": 58000, "totalCost": 0.1072, "cwdOnTaskInitialization": "/Users/alice/repo", "modelId": "claude-sonnet-4-5"}]

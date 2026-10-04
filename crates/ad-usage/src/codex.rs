@@ -309,6 +309,7 @@ impl Sink<'_> {
             output: delta[3],
             reasoning: delta[4],
             flags: if self.st.priority { FLAG_PRIORITY } else { 0 },
+            known_cost: 0,
         };
         if !rec.is_empty() {
             self.entry.push_dedup(&mut self.keys, rec);

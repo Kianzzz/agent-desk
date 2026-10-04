@@ -1,16 +1,54 @@
 import type { Settings, Tool } from "../types";
 
-export const TOOL_LABEL: Record<Tool, string> = {
+export const TOOL_LABEL: Record<Tool | "other", string> = {
   claude: "Claude",
   codex: "Codex",
   gemini: "Gemini",
+  grok: "Grok",
+  droid: "Droid",
+  opencode: "OpenCode",
+  copilot: "Copilot",
+  qwen: "Qwen Code",
+  kimi: "Kimi",
+  cline: "Cline",
+  roo: "Roo Code",
+  kilo: "Kilo",
+  amp: "Amp",
+  pi: "Pi",
+  openclaw: "OpenClaw",
+  codebuddy: "CodeBuddy",
+  crush: "Crush",
+  goose: "Goose",
+  other: "其他",
 };
 
-export const TOOL_ORDER: Tool[] = ["claude", "codex", "gemini"];
+/** 固定的展示顺序，也是图表里堆叠的顺序。 */
+export const TOOL_ORDER: Tool[] = [
+  "claude",
+  "codex",
+  "gemini",
+  "grok",
+  "droid",
+  "opencode",
+  "copilot",
+  "qwen",
+  "kimi",
+  "cline",
+  "roo",
+  "kilo",
+  "amp",
+  "pi",
+  "openclaw",
+  "codebuddy",
+  "crush",
+  "goose",
+];
 
-/** 每个工具固定一个颜色，筛选后也不变。 */
+/** 前六个工具各有固定颜色（过了配色校验），其余统一灰色。颜色跟着工具走，筛选后也不变。 */
+const COLORED = new Set(["claude", "codex", "gemini", "grok", "droid", "opencode"]);
+
 export function toolVar(tool: string): string {
-  return tool === "claude" || tool === "codex" || tool === "gemini" ? `var(--tool-${tool})` : "var(--text-muted)";
+  return COLORED.has(tool) ? `var(--tool-${tool})` : "var(--tool-other)";
 }
 
 /** 旧接口保留：费用一律按美元显示。 */

@@ -6,10 +6,10 @@ import { AccountCard } from "../components/AccountCard";
 import { StackedBars, ToolLegend } from "../components/StackedBars";
 import { ErrorBox, Loading } from "../components/ui";
 import { sumSafe } from "../lib/disk";
-import { addDays, ago, bytes, localDate, money, TOOL_LABEL, tokens, toolVar } from "../lib/format";
+import { addDays, ago, bytes, localDate, money, TOOL_LABEL, TOOL_ORDER, tokens, toolVar } from "../lib/format";
 import { useAccounts, useDisk, useSecurity, useSettings, useTick, useUsage } from "../lib/hooks";
-import { byModel, byTool, dailySeries, rowsInRange, sumRows, todayAndYesterday, totalTokens } from "../lib/usage";
-import type { Inventory, Tool } from "../types";
+import { byModel, byTool, dailySeries, foldSeries, rowsInRange, sumRows, todayAndYesterday, totalTokens, withUsageOnly } from "../lib/usage";
+import type { Inventory } from "../types";
 
 export function Overview({ go }: { go: (p: Page) => void }) {
   useTick();
@@ -70,9 +70,10 @@ export function Overview({ go }: { go: (p: Page) => void }) {
   const series = dailySeries(snap, 30);
   const todayTools = byTool(todayRows);
   const tools30 = byTool(rows30);
-  const toolOrder = (["claude", "codex", "gemini"] as Tool[]).filter((t) => tools30.has(t));
+  const toolOrder = TOOL_ORDER.filter((t) => tools30.has(t));
+  const chart = foldSeries(series, toolOrder);
   const models = byModel(todayRows).sort((a, b) => totalTokens(b.tokens) - totalTokens(a.tokens));
-  const loggedIn = (accounts ?? []).filter((a) => a.loggedIn);
+  const loggedIn = withUsageOnly(accounts, tools30.keys()).filter((a) => a.loggedIn);
   // 30 天内用过、或有额度数据的给完整卡片；其余收成一行
   const shown = loggedIn.filter((a) => tools30.has(a.tool) || a.windows.length > 0);
   const idle = loggedIn.filter((a) => !shown.includes(a));
@@ -146,10 +147,10 @@ export function Overview({ go }: { go: (p: Page) => void }) {
         <div className="card-title">
           最近 30 天 tokens
           <span className="right">
-            <ToolLegend tools={toolOrder} />
+            <ToolLegend tools={chart.series} />
           </span>
         </div>
-        <StackedBars points={series} tools={toolOrder} height={200} metric="tokens" />
+        <StackedBars points={chart.points} tools={chart.series} height={200} metric="tokens" />
       </div>
 
       <div className="grid section" style={{ gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)" }}>

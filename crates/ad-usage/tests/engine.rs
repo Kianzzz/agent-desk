@@ -506,7 +506,8 @@ fn empty_home_is_fine() {
     let env = Env::empty();
     let s = env.engine().refresh().unwrap();
     assert!(s.days.is_empty() && s.sessions.is_empty() && s.quotas.is_empty());
-    assert_eq!(s.sources.len(), 3);
+    // 每个工具一条，本机没有的工具安静地是 0 条
+    assert_eq!(s.sources.len(), 18);
     assert!(s
         .sources
         .iter()
@@ -635,4 +636,120 @@ fn network_pricing_update() {
     let s = eng.refresh().unwrap();
     assert!(s.pricing_updated_at.is_some());
     assert!(totals(&s, Tool::Claude).cost > 0.0);
+}
+
+/// 新增工具的端到端：几个工具的样例合到一个主目录里跑引擎。
+#[test]
+fn new_tools_end_to_end() {
+    let env = Env::empty();
+    for t in [
+        "grok-home",
+        "droid-home",
+        "pi-home",
+        "qwen-home",
+        "kimi-home",
+        "cline-home",
+    ] {
+        copy_dir(&fixtures().join("tools").join(t), env.home.path());
+    }
+    let mut eng = env.engine();
+    let s = eng.refresh().unwrap();
+    for src in &s.sources {
+        assert!(src.errors.is_empty(), "{:?}: {:?}", src.tool, src.errors);
+    }
+    let src = |t: Tool| s.sources.iter().find(|x| x.tool == t).unwrap();
+    assert_eq!(src(Tool::Grok).files, 3);
+    assert_eq!(src(Tool::Droid).files, 4);
+    assert_eq!(src(Tool::Goose).files, 0);
+
+    // Grok：主会话 3 条 + fork 里新的 1 条（复制来的回合去重）；子代理会话不计。
+    // 有 costUsdTicks 的直接用；其余两条不在测试价格表里，算未定价
+    let g = totals(&s, Tool::Grok);
+    assert_eq!(g.requests, 4);
+    assert_eq!(g.unpriced, 2);
+    approx(g.cost, 0.0123 + 0.0005);
+    assert!(s.unpriced_models.contains(&"grok-4.6".to_string()));
+
+    // Droid：S1 按 claude-sonnet-4-5 定价，S2 / S4 的模型没有价格
+    let d = totals(&s, Tool::Droid);
+    let s1 = 110.0 * 3e-6 + 6659.0 * 1.5e-5 + 169919.0 * 3e-7 + 40180.0 * 3.75e-6;
+    approx(d.cost, s1);
+    assert_eq!(d.requests, 3 + 1 + 1);
+    assert_eq!(d.unpriced, 2);
+    assert_eq!(d.input + d.cache_read, 110 + 169919 + 10 + 40 + 5 + 7);
+    let droid_sessions = s.sessions.iter().filter(|x| x.tool == Tool::Droid).count();
+    assert_eq!(droid_sessions, 3);
+    let p = s
+        .projects
+        .iter()
+        .find(|p| p.tool == Tool::Droid && p.project == "/Users/test/droidproj")
+        .unwrap();
+    assert_eq!(p.sessions, 1);
+
+    // Pi：父会话 4 条 + fork 新增 1 条；有 cost.total 的直接用
+    let pi = totals(&s, Tool::Pi);
+    assert_eq!(pi.requests, 5);
+    // Kimi：kimi-cli 3 条（子代理文件里的那条和包装的去重）+ Kimi Code 2 条
+    assert_eq!(totals(&s, Tool::Kimi).requests, 5);
+    // Qwen：q1 3 条 + 分支 1 条 + 归档 1 条 + 子代理 1 条
+    assert_eq!(totals(&s, Tool::Qwen).requests, 6);
+    // Cline：同一任务在两个编辑器里只算一次（5 条）+ SDK 会话 3 条；Roo 3 条
+    assert_eq!(totals(&s, Tool::Cline).requests, 8);
+    assert_eq!(totals(&s, Tool::Roo).requests, 3);
+
+    let v = serde_json::to_value(&s).unwrap();
+    let tools: Vec<&str> = v["sources"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["tool"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        tools,
+        vec![
+            "claude",
+            "codex",
+            "gemini",
+            "grok",
+            "opencode",
+            "kilo",
+            "qwen",
+            "copilot",
+            "cline",
+            "roo",
+            "kimi",
+            "droid",
+            "amp",
+            "pi",
+            "openclaw",
+            "codebuddy",
+            "crush",
+            "goose"
+        ]
+    );
+
+    // 从磁盘缓存冷启动：已知费用也存下来了
+    let cold = env.engine().refresh().unwrap();
+    for tool in [
+        Tool::Grok,
+        Tool::Droid,
+        Tool::Pi,
+        Tool::Kimi,
+        Tool::Qwen,
+        Tool::Cline,
+        Tool::Roo,
+    ] {
+        let (a, b) = (totals(&s, tool), totals(&cold, tool));
+        approx(a.cost, b.cost);
+        assert_eq!(a.requests, b.requests);
+    }
+
+    // 删掉主会话：fork 里的副本接替，记录不丢也不重复
+    fs::remove_dir_all(env.path(".grok/sessions/%2FUsers%2Ftest%2Fgrokproj/sess-main")).unwrap();
+    let after = eng.refresh().unwrap();
+    let g2 = totals(&after, Tool::Grok);
+    assert_eq!(g2.requests, 4);
+    approx(g2.cost, g.cost);
+    let gs = after.sources.iter().find(|x| x.tool == Tool::Grok).unwrap();
+    assert_eq!((gs.files, gs.archived_records), (2, 1));
 }

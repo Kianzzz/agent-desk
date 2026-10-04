@@ -166,6 +166,7 @@ pub(crate) fn parse(
                     output: tok.output + tok.thoughts,
                     reasoning: tok.thoughts,
                     flags: 0,
+                    known_cost: 0,
                 };
                 if !rec.is_empty() {
                     entry.push_dedup(&mut keys, rec);

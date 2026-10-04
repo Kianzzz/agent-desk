@@ -170,6 +170,7 @@ impl Sink<'_> {
             } else {
                 0
             },
+            known_cost: 0,
         };
         self.entry.push_dedup(&mut self.keys, rec);
         true

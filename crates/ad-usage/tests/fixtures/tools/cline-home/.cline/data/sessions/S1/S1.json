@@ -1,0 +1,1 @@
+{"version": 1, "session_id": "S1", "source": "cli", "pid": 1, "started_at": "2026-09-20T10:00:00.000Z", "status": "completed", "interactive": true, "provider": "anthropic", "model": "claude-sonnet-4-5", "cwd": "/Users/alice/repo", "workspace_root": "/Users/alice/repo", "enable_tools": true, "enable_spawn": false, "enable_teams": false, "metadata": {"title": "Inspect repo"}}

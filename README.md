@@ -16,13 +16,25 @@ macOS 上的本地 AI Agent 管理工具：看各家 AI 每天用了多少 token
 
 ## 支持的工具
 
-| 工具 | 用量 | 账号等级 | 额度 |
-|---|---|---|---|
-| Claude Code（终端、桌面版的 Code 标签、IDE 插件） | ✓ | ✓ | ✓ 需接入状态栏，见下文 |
-| Codex（命令行、桌面版） | ✓ | ✓ | ✓ 来自会话日志 |
-| Gemini CLI | ✓ | 只显示登录方式 | — 本机没有记录 |
+用量（token 和折算费用）能读这些工具留在本机的记录：
 
-ChatGPT、Claude 桌面版的普通对话等只在云端记录用量的工具，读不到。
+| 工具 | 本机记录位置 | 说明 |
+|---|---|---|
+| Claude Code（终端、桌面版的 Code 标签、IDE 插件） | `~/.claude/projects` | 有账号等级；额度需接入状态栏，见下文 |
+| Codex（命令行、桌面版） | `~/.codex/sessions` | 有账号等级和额度 |
+| Gemini CLI | `~/.gemini/tmp` | 只显示登录方式 |
+| Grok Build（xAI 官方）、grok-dev（社区版） | `~/.grok` | 自带费用 |
+| OpenCode、Kilo CLI | `~/.local/share/opencode`、`~/.local/share/kilo` | |
+| Qwen Code | `~/.qwen/projects` | |
+| GitHub Copilot CLI | `~/.copilot` | |
+| Cline、Roo Code、Kilo Code（VS Code、Cursor、Windsurf 等编辑器里的扩展） | 编辑器的 `globalStorage`、`~/.cline` | 自带费用 |
+| Kimi CLI、Kimi Code | `~/.kimi`、`~/.kimi-code` | |
+| Amp | `~/.local/share/amp/threads` | |
+| Pi、OpenClaw | `~/.pi`、`~/.openclaw` | 自带费用 |
+| CodeBuddy | `~/.codebuddy/projects` | |
+| Factory Droid、Crush、Goose | `~/.factory`、`.crush`、`~/.local/share/goose` | 只记会话累计值，按天的拆分是估算 |
+
+没装的工具不会报错，装上用过以后自动出现。ChatGPT、Claude 桌面版的普通对话、Cursor 等只在云端记录用量的工具读不到；Aider 的本机记录按千取整、Kiro 本机记的 token 多为 0，没有接入。
 
 ## 数据从哪来
 

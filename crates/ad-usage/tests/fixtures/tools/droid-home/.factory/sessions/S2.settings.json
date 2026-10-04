@@ -1,0 +1,1 @@
+{"assistantActiveTimeMs": 1000, "providerLock": "anthropic", "providerLockTimestamp": "2026-09-02T09:00:00.000Z", "model": "custom:Claude-Opus-4.5-Thinking-[Anthropic]-0", "tokenUsage": {"inputTokens": 10, "outputTokens": 20, "cacheCreationTokens": 30, "cacheReadTokens": 40, "thinkingTokens": 5}}

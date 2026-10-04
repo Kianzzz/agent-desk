@@ -10,11 +10,47 @@ use std::time::Instant;
 
 use ad_usage::{Tool, UsageEngine, UsageSnapshot};
 
+const ALL_TOOLS: [Tool; 18] = [
+    Tool::Claude,
+    Tool::Codex,
+    Tool::Gemini,
+    Tool::Grok,
+    Tool::Opencode,
+    Tool::Kilo,
+    Tool::Qwen,
+    Tool::Copilot,
+    Tool::Cline,
+    Tool::Roo,
+    Tool::Kimi,
+    Tool::Droid,
+    Tool::Amp,
+    Tool::Pi,
+    Tool::Openclaw,
+    Tool::Codebuddy,
+    Tool::Crush,
+    Tool::Goose,
+];
+
 fn tool_name(t: Tool) -> &'static str {
     match t {
         Tool::Claude => "Claude",
         Tool::Codex => "Codex",
         Tool::Gemini => "Gemini",
+        Tool::Grok => "Grok",
+        Tool::Opencode => "OpenCode",
+        Tool::Kilo => "Kilo",
+        Tool::Qwen => "Qwen",
+        Tool::Copilot => "Copilot",
+        Tool::Cline => "Cline",
+        Tool::Roo => "Roo",
+        Tool::Kimi => "Kimi",
+        Tool::Droid => "Droid",
+        Tool::Amp => "Amp",
+        Tool::Pi => "Pi",
+        Tool::Openclaw => "OpenClaw",
+        Tool::Codebuddy => "CodeBuddy",
+        Tool::Crush => "Crush",
+        Tool::Goose => "Goose",
     }
 }
 
@@ -63,7 +99,7 @@ fn main() -> anyhow::Result<()> {
     println!("\n== 数据源 ==");
     for src in &s.sources {
         println!(
-            "{:7} 文件 {:4}  记录 {:7}  已删除文件里的记录 {:5}  最新 {:?}  错误 {:?}",
+            "{:9} 文件 {:4}  记录 {:7}  已删除文件里的记录 {:5}  最新 {:?}  错误 {:?}",
             tool_name(src.tool),
             src.files,
             src.records,
@@ -84,7 +120,7 @@ fn main() -> anyhow::Result<()> {
     for d in s.days.iter().filter(|d| d.date.as_str() >= cutoff.as_str()) {
         *per_day.entry(d.date.as_str()).or_default() += d.cost_usd;
         println!(
-            "{} {:6} {:24} 请求 {:5}  输入 {:>8}  输出 {:>7}  缓存读 {:>9}  缓存写 {:>8}  ${:9.2}{}",
+            "{} {:9} {:24} 请求 {:5}  输入 {:>8}  输出 {:>7}  缓存读 {:>9}  缓存写 {:>8}  ${:9.2}{}",
             d.date,
             tool_name(d.tool),
             d.model,
@@ -140,7 +176,7 @@ fn main() -> anyhow::Result<()> {
     println!("\n== 费用最高的项目 ==");
     for p in s.projects.iter().take(8) {
         println!(
-            "{:6} ${:9.2}  会话 {:3}  {}",
+            "{:9} ${:9.2}  会话 {:3}  {}",
             tool_name(p.tool),
             p.cost_usd,
             p.sessions,
@@ -151,7 +187,7 @@ fn main() -> anyhow::Result<()> {
     println!("\n== 最近的会话（共输出 {} 个）==", s.sessions.len());
     for x in s.sessions.iter().take(8) {
         println!(
-            "{:6} {}  ${:8.2}  {:?}  {:?}",
+            "{:9} {}  ${:8.2}  {:?}  {:?}",
             tool_name(x.tool),
             x.last_active,
             x.cost_usd,
@@ -168,12 +204,19 @@ fn print_totals(s: &UsageSnapshot, since: Option<&str>) {
         Some(d) => println!("\n== 各工具总额（{d} 起）=="),
     }
     let mut sum = 0.0;
-    for tool in [Tool::Claude, Tool::Codex, Tool::Gemini] {
+    for tool in ALL_TOOLS {
         let rows = s
             .days
             .iter()
             .filter(|d| d.tool == tool && since.is_none_or(|c| d.date.as_str() >= c));
         let (mut cost, mut req, mut unpriced, mut tok) = (0.0, 0, 0, 0);
+        // 会话数取项目汇总（不受会话列表 300 条的限制），只在全部历史时有意义
+        let sessions: u32 = s
+            .projects
+            .iter()
+            .filter(|p| p.tool == tool)
+            .map(|p| p.sessions)
+            .sum();
         for d in rows {
             cost += d.cost_usd;
             req += d.requests;
@@ -182,13 +225,18 @@ fn print_totals(s: &UsageSnapshot, since: Option<&str>) {
         }
         sum += cost;
         println!(
-            "{:7} ${:10.2}  请求 {:7}  token {:>10}  未定价请求 {}",
+            "{:9} ${:10.2}  请求 {:7}  token {:>10}  未定价请求 {:5}  会话 {}",
             tool_name(tool),
             cost,
             req,
             mtok(tok),
-            unpriced
+            unpriced,
+            if since.is_none() {
+                sessions.to_string()
+            } else {
+                "-".to_string()
+            }
         );
     }
-    println!("合计    ${sum:10.2}");
+    println!("合计      ${sum:10.2}");
 }

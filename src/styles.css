@@ -21,6 +21,11 @@
   --tool-claude: #d47250;
   --tool-codex: #3987e5;
   --tool-gemini: #199e70;
+  --tool-grok: #9085e9;
+  --tool-droid: #c98500;
+  --tool-opencode: #d55181;
+  /* 前六个之外的工具统一用灰色，图表里合并成「其他」 */
+  --tool-other: #6a6a73;
   --good: #3ccf91;
   --good-ink: #5fd8a2;
   --warning: #f5a524;
@@ -82,6 +87,10 @@
   --tool-claude: #d97757;
   --tool-codex: #2a78d6;
   --tool-gemini: #13915f;
+  --tool-grok: #4a3aa7;
+  --tool-droid: #b98500;
+  --tool-opencode: #c94f84;
+  --tool-other: #9a9aa2;
   --good: #12a150;
   --good-ink: #0b7a43;
   --warning: #e8930c;
@@ -140,6 +149,10 @@
     --tool-claude: #d97757;
     --tool-codex: #2a78d6;
     --tool-gemini: #13915f;
+    --tool-grok: #4a3aa7;
+    --tool-droid: #b98500;
+    --tool-opencode: #c94f84;
+    --tool-other: #9a9aa2;
     --good: #12a150;
     --good-ink: #0b7a43;
     --warning: #e8930c;

@@ -1,0 +1,1 @@
+{"cwd":"/Users/test/qwen_proj","version":"0.14.2","gitBranch":"main","uuid":"z1","parentUuid":null,"sessionId":"q-arch","timestamp":"2026-08-01T01:00:00.000Z","type":"assistant","model":"qwen3-coder-plus","message":{"role":"model","parts":[]},"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":1,"totalTokenCount":11}}

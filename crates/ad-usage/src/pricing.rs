@@ -182,7 +182,8 @@ impl Pricing {
         self.models.len()
     }
 
-    /// 先精确匹配；再依次去掉 `[1m]` 之类的后缀、provider 前缀、`@版本`、日期后缀。
+    /// 先精确匹配；再依次去掉 `[1m]` 之类的后缀、provider 前缀、`@版本`、日期后缀，
+    /// 最后是 Grok Build 的 `-build` 后缀。
     pub fn lookup(&self, model: &str) -> Option<&ModelPrice> {
         let mut name = model.trim();
         if let Some(p) = self.models.get(name) {
@@ -208,6 +209,15 @@ impl Pricing {
         }
         if let Some(stripped) = strip_date_suffix(name) {
             if let Some(p) = self.models.get(stripped) {
+                return Some(p);
+            }
+        }
+        // Grok Build 的模型名带 `-build`（如 `grok-4.5-build`），按同名基础模型计价
+        if let Some(base) = name
+            .strip_suffix("-build")
+            .filter(|b| b.starts_with("grok-"))
+        {
+            if let Some(p) = self.models.get(base) {
                 return Some(p);
             }
         }
@@ -307,7 +317,25 @@ fn provider_of(v: &Map<String, Value>) -> &str {
         .unwrap_or("")
 }
 
-/// 从 LiteLLM 原始价格表里挑出 Anthropic / OpenAI / Gemini 的对话模型，只留计费需要的字段。
+/// 其他厂商：(litellm_provider, 键名前缀)。按优先级排列，同名模型先到先得。
+/// 阿里云百炼（dashscope）也转售别家模型，只收它自己的 Qwen。
+const EXTRA_PROVIDERS: [(&str, &str); 7] = [
+    ("xai", "xai/"),
+    ("deepseek", "deepseek/"),
+    ("moonshot", "moonshot/"),
+    ("zai", "zai/"),
+    ("mistral", "mistral/"),
+    ("minimax", "minimax/"),
+    ("dashscope", "dashscope/"),
+];
+
+fn extra_name_ok(provider: &str, name: &str) -> bool {
+    provider != "dashscope" || name.starts_with("qwen") || name.starts_with("qwq")
+}
+
+/// 从 LiteLLM 原始价格表里挑出 Anthropic / OpenAI / Gemini，以及 xAI、DeepSeek、Moonshot、
+/// 智谱、Mistral、MiniMax、Qwen 的对话模型，只留计费需要的字段。
+/// 带 `provider/` 前缀的键去掉前缀作为模型名；和不带前缀的原条目重名时以原条目为准。
 pub(crate) fn filter_litellm(raw: &Value, fetched_at: &str) -> anyhow::Result<Value> {
     let obj = raw
         .as_object()
@@ -320,10 +348,16 @@ pub(crate) fn filter_litellm(raw: &Value, fetched_at: &str) -> anyhow::Result<Va
         }
         let Some(v) = v.as_object() else { continue };
         let mode = mode_of(v);
-        let ok = match provider_of(v) {
+        let provider = provider_of(v);
+        let ok = match provider {
             "anthropic" | "openai" => matches!(mode, "chat" | "responses"),
             "gemini" | "vertex_ai-language-models" => mode == "chat" && k.starts_with("gemini"),
-            _ => false,
+            p => {
+                matches!(mode, "chat" | "responses")
+                    && EXTRA_PROVIDERS
+                        .iter()
+                        .any(|(ep, _)| *ep == p && extra_name_ok(p, k))
+            }
         };
         if ok {
             if let Some(m) = slim(v) {
@@ -342,6 +376,28 @@ pub(crate) fn filter_litellm(raw: &Value, fetched_at: &str) -> anyhow::Result<Va
             }
             let Some(v) = v.as_object() else { continue };
             if mode_of(v) != "chat" {
+                continue;
+            }
+            if let Some(m) = slim(v) {
+                out.insert(name.to_string(), m);
+            }
+        }
+    }
+    // 其他厂商带前缀的键
+    for (provider, prefix) in EXTRA_PROVIDERS {
+        for (k, v) in obj {
+            let Some(name) = k.strip_prefix(prefix) else {
+                continue;
+            };
+            if name.is_empty()
+                || name.contains('/')
+                || out.contains_key(name)
+                || !extra_name_ok(provider, name)
+            {
+                continue;
+            }
+            let Some(v) = v.as_object() else { continue };
+            if provider_of(v) != provider || !matches!(mode_of(v), "chat" | "responses") {
                 continue;
             }
             if let Some(m) = slim(v) {
@@ -454,13 +510,42 @@ mod tests {
             "azure/gpt-x": {"litellm_provider": "azure", "mode": "chat",
                 "input_cost_per_token": 9.0, "output_cost_per_token": 9.0},
             "mistral-z": {"litellm_provider": "mistral", "mode": "chat",
+                "input_cost_per_token": 1.0, "output_cost_per_token": 1.0},
+            "xai/grok-z": {"litellm_provider": "xai", "mode": "chat",
+                "input_cost_per_token": 2e-6, "output_cost_per_token": 6e-6},
+            "xai/grok-image": {"litellm_provider": "xai", "mode": "image_generation",
+                "input_cost_per_token": 2e-6, "output_cost_per_token": 6e-6},
+            "deepseek-chat": {"litellm_provider": "deepseek", "mode": "chat",
+                "input_cost_per_token": 2.8e-7, "output_cost_per_token": 4.2e-7},
+            "deepseek/deepseek-chat": {"litellm_provider": "deepseek", "mode": "chat",
+                "input_cost_per_token": 9.0, "output_cost_per_token": 9.0},
+            "dashscope/deepseek-chat": {"litellm_provider": "dashscope", "mode": "chat",
+                "input_cost_per_token": 8.0, "output_cost_per_token": 8.0},
+            "dashscope/qwen-max": {"litellm_provider": "dashscope", "mode": "chat",
+                "input_cost_per_token": 1.6e-6, "output_cost_per_token": 6.4e-6},
+            "dashscope/glm-9": {"litellm_provider": "dashscope", "mode": "chat",
+                "input_cost_per_token": 1.0, "output_cost_per_token": 1.0},
+            "openrouter/x-ai/grok-q": {"litellm_provider": "openrouter", "mode": "chat",
                 "input_cost_per_token": 1.0, "output_cost_per_token": 1.0}
         });
         let v = filter_litellm(&raw, "2026-10-04T00:00:00Z").unwrap();
         let models = v["models"].as_object().unwrap();
         let mut names: Vec<_> = models.keys().cloned().collect();
         names.sort();
-        assert_eq!(names, vec!["claude-x", "gemini-y", "gpt-x"]);
+        // 其他厂商：去掉前缀；不带前缀的原条目优先；百炼只收 Qwen；非对话模型、转售平台不收
+        assert_eq!(
+            names,
+            vec![
+                "claude-x",
+                "deepseek-chat",
+                "gemini-y",
+                "gpt-x",
+                "grok-z",
+                "mistral-z",
+                "qwen-max"
+            ]
+        );
+        assert_eq!(models["deepseek-chat"]["input_cost_per_token"], 2.8e-7);
         assert!(models["claude-x"]
             .get("input_cost_per_token_batches")
             .is_none());
@@ -476,6 +561,10 @@ mod tests {
         assert!(p.lookup("claude-x-2").is_none());
         assert!(p.lookup("claude").is_none());
         assert!(p.lookup("gpt-x-mini").is_none());
+        // Grok Build 的 `-build` 后缀
+        assert!(p.lookup("grok-z-build").is_some());
+        assert!(p.lookup("xai/grok-z").is_some());
+        assert!(p.lookup("claude-x-build").is_none());
     }
 
     #[test]
@@ -495,6 +584,15 @@ mod tests {
             "gemini-3.1-pro-preview",
             "gemini-2.5-pro",
             "gemini-2.5-flash",
+            "grok-4.5",
+            "grok-4.5-build",
+            "grok-code-fast-1",
+            "deepseek-chat",
+            "kimi-k2.6",
+            "glm-4.6",
+            "qwen-max",
+            "codestral-latest",
+            "MiniMax-M2",
         ] {
             assert!(p.lookup(m).is_some(), "{m} 没有价格");
         }

@@ -1,7 +1,25 @@
 // 与 crates/*/src/lib.rs 的公共类型一一对应（serde camelCase）。
 
 // ---------- ad-usage ----------
-export type Tool = "claude" | "codex" | "gemini";
+export type Tool =
+  | "claude"
+  | "codex"
+  | "gemini"
+  | "grok"
+  | "droid"
+  | "opencode"
+  | "copilot"
+  | "qwen"
+  | "kimi"
+  | "cline"
+  | "roo"
+  | "kilo"
+  | "amp"
+  | "pi"
+  | "openclaw"
+  | "codebuddy"
+  | "crush"
+  | "goose";
 
 export interface TokenCounts {
   input: number;

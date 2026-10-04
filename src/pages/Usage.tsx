@@ -3,9 +3,9 @@ import { useMemo, useState } from "react";
 import { api } from "../api";
 import { StackedBars, ToolLegend } from "../components/StackedBars";
 import { ErrorBox, Loading, Segmented, Spinner, Toast, useToast } from "../components/ui";
-import { addDays, ago, basename, int, localDate, money, TOOL_LABEL, tildify, tokens, toolVar } from "../lib/format";
+import { addDays, ago, basename, int, localDate, money, TOOL_LABEL, TOOL_ORDER, tildify, tokens, toolVar } from "../lib/format";
 import { useAction, useUsage } from "../lib/hooks";
-import { byModel, dailySeries, firstDate, rowsInRange, sumRows, totalTokens } from "../lib/usage";
+import { byModel, dailySeries, firstDate, foldSeries, rowsInRange, sumRows, totalTokens } from "../lib/usage";
 import type { Tool } from "../types";
 
 type Range = "1" | "7" | "30" | "90" | "all";
@@ -20,7 +20,7 @@ export function Usage() {
 
   const snap = usage?.snapshot ?? null;
   const allTools = useMemo(
-    () => (["claude", "codex", "gemini"] as Tool[]).filter((t) => snap?.days.some((d) => d.tool === t)),
+    () => TOOL_ORDER.filter((t) => snap?.days.some((d) => d.tool === t)),
     [snap],
   );
 
@@ -44,7 +44,7 @@ export function Usage() {
   const totals = sumRows(rows);
   const models = byModel(rows).sort((a, b) => totalTokens(b.tokens) - totalTokens(a.tokens));
   const tools = allTools.filter((t) => active.has(t));
-  const series = dailySeries(snap, Math.min(days, 400), active);
+  const chart = foldSeries(dailySeries(snap, Math.min(days, 400), active), tools);
   const projects = snap.projects
     .filter((p) => active.has(p.tool) && (from === null || p.lastActive.slice(0, 10) >= from))
     .sort((a, b) => totalTokens(b.tokens) - totalTokens(a.tokens))
@@ -52,6 +52,9 @@ export function Usage() {
   const sessions = snap.sessions.filter((s) => active.has(s.tool) && (from === null || s.lastActive.slice(0, 10) >= from)).slice(0, 15);
   const dayRows = [...new Set(rows.map((r) => r.date))].sort().reverse();
   const allTok = totalTokens(totals.tokens);
+  // 同一个工具可能有好几个数据源（比如新旧两种存储），有数据或报错的才列出来
+  const activeSources = snap.sources.filter((s) => s.files > 0 || s.records > 0 || s.errors.length > 0);
+  const idleSources = [...new Map(snap.sources.filter((s) => !activeSources.some((a) => a.tool === s.tool)).map((s) => [s.tool, s])).values()];
   const hit = totals.tokens.cacheRead + totals.tokens.input + totals.tokens.cacheWrite;
 
   const toggleTool = (t: Tool) => {
@@ -103,10 +106,10 @@ export function Usage() {
           <div className="card-title">
             每日 tokens
             <span className="right">
-              <ToolLegend tools={tools} />
+              <ToolLegend tools={chart.series} />
             </span>
           </div>
-          <StackedBars points={series} tools={tools} height={220} metric="tokens" />
+          <StackedBars points={chart.points} tools={chart.series} height={220} metric="tokens" />
         </div>
       )}
 
@@ -311,7 +314,7 @@ export function Usage() {
             </tr>
           </thead>
           <tbody>
-            {snap.sources.map((s) => (
+            {activeSources.map((s) => (
               <tr key={s.tool + s.root}>
                 <td>{TOOL_LABEL[s.tool]}</td>
                 <td className="mono truncate" style={{ maxWidth: 320 }}>
@@ -332,6 +335,11 @@ export function Usage() {
             ))}
           </tbody>
         </table>
+        {idleSources.length > 0 && (
+          <div className="label" style={{ marginTop: 10 }}>
+            也支持 {idleSources.map((s) => TOOL_LABEL[s.tool]).join("、")}，本机没装或还没用过，装上用过以后会自动出现在这里。
+          </div>
+        )}
         {snap.unpricedModels.length > 0 && (
           <div className="note" style={{ marginTop: 10 }}>
             <Info size={14} />

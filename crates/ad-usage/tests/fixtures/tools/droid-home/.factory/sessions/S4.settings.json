@@ -1,0 +1,1 @@
+{"assistantActiveTimeMs": 1, "providerLock": "openai", "apiProviderLock": "openai", "providerLockTimestamp": "2026-09-03T09:00:00.000Z", "tokenUsage": {"inputTokens": 5, "outputTokens": 6, "cacheCreationTokens": 0, "cacheReadTokens": 7, "thinkingTokens": 0}}
