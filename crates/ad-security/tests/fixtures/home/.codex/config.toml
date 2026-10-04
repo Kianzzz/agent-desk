@@ -1,0 +1,10 @@
+model = "gpt-5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[mcp_servers.git]
+command = "uvx"
+args = ["mcp-server-git==0.6.2"]
+
+[mcp_servers.remote]
+url = "https://mcp.example.net/mcp"

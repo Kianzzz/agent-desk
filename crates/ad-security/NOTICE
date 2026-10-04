@@ -1,0 +1,35 @@
+ad-security
+Copyright (c) 2026 Agent Desk contributors
+
+本 crate 的部分检测规则和代码移植、改写自 ThinkWatch（MIT 许可证）：
+
+- 隐藏字符的码位分类、不可见字符的可见化（tw-guard/src/hidden.rs）
+- 提示词注入和危险命令规则（tw-guard/data/rules.yaml）
+- 密钥前缀表、token 边界切分、JWT 和 PEM 私钥块识别（tw-guard/src/redact/rules.rs）
+- 本机地址判定、钩子命令的递归查找、MCP 配置的解析方式（ThinkWatch Lite 的 tw-scan/src/report.rs）
+
+ThinkWatch 的版权声明和许可证原文如下：
+
+--------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 ThinkWatch
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

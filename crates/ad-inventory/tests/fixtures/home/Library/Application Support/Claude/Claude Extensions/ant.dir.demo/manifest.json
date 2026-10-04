@@ -1,0 +1,16 @@
+{
+  "name": "demo-ext",
+  "display_name": "演示扩展",
+  "server": {
+    "type": "node",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {
+        "DEMO_KEY": "demo-secret"
+      }
+    }
+  }
+}

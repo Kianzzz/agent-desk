@@ -1,0 +1,21 @@
+[package]
+name = "ad-inventory"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+sha2 = { workspace = true, features = ["asm"] }
+hex.workspace = true
+toml_edit.workspace = true
+trash.workspace = true
+rayon.workspace = true
+walkdir = "2"
+yaml-rust2 = "0.10"
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "projsrv": {
+      "command": "bunx",
+      "args": [
+        "some-mcp"
+      ]
+    },
+    "projoff": {
+      "url": "https://example.com/events/sse"
+    }
+  }
+}

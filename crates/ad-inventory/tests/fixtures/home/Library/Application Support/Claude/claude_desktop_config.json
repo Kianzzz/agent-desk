@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "fs": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/tmp"
+      ]
+    },
+    "weather": {
+      "command": "uvx",
+      "args": [
+        "weather-mcp"
+      ],
+      "env": {
+        "WEATHER_API_KEY": "wk-123456789"
+      }
+    },
+    "notes": {
+      "url": "https://notes.example.com/mcp"
+    }
+  },
+  "preferences": {
+    "sidebarMode": "chat"
+  }
+}

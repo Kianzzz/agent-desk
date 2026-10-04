@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cur": {
+      "command": "npx",
+      "args": [
+        "cursor-mcp"
+      ],
+      "disabled": true
+    }
+  }
+}

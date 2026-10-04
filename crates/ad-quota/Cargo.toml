@@ -1,0 +1,16 @@
+[package]
+name = "ad-quota"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+base64 = "0.22"
+ad-usage = { path = "../ad-usage" }
+
+[dev-dependencies]
+tempfile.workspace = true

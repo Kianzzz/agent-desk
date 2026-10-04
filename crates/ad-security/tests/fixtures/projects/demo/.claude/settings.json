@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "xattr -cr /Applications/Foo.app"
+          }
+        ]
+      }
+    ]
+  }
+}

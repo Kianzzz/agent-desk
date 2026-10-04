@@ -1,0 +1,4 @@
+# 构建产物放在 target.nosync。名字带 .nosync，项目放在 iCloud 同步目录里时不会被同步；
+# 也可以把它做成指向同步范围之外的链接（见 README）。
+[build]
+target-dir = "target.nosync"

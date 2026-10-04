@@ -1,0 +1,37 @@
+# Codex 配置
+model = "gpt-6-sol"
+notify = ["/usr/local/bin/notifier", "turn-ended"]
+
+[features]
+hooks = false
+
+# 第一个服务
+[mcp_servers.alpha]
+command = "npx"
+args = ["-y", "@foo/alpha-mcp"]
+
+[mcp_servers.alpha.env]
+ALPHA_KEY = "alpha-secret-999"
+
+# 远程服务
+[mcp_servers.remote]
+url = "https://example.com/sse"
+bearer_token_env_var = "REMOTE_TOKEN"
+
+[mcp_servers.remote.http_headers]
+X-Team = "team-secret"
+
+[mcp_servers.off]
+command = "/bin/off"
+enabled = false
+
+[mcp_servers.last]
+command = "uvx"
+args = ["last-mcp"] # 行尾注释
+
+[[skills.config]]
+path = "__HOME__/.codex/skills/beta/SKILL.md"
+enabled = false
+
+[desktop]
+theme = "dark"

@@ -1,0 +1,20 @@
+[package]
+name = "ad-disk"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+rayon.workspace = true
+sha2.workspace = true
+hex.workspace = true
+memchr.workspace = true
+trash.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,39 @@
+{
+  "general": {
+    "vimMode": false
+  },
+  "mcpServers": {
+    "ghttp": {
+      "httpUrl": "https://g.example.com/mcp"
+    },
+    "gsse": {
+      "url": "https://g.example.com/events"
+    },
+    "gstdio": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "gem-mcp"
+      ]
+    }
+  },
+  "mcp": {
+    "excluded": [
+      "gstdio"
+    ]
+  },
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "check.sh",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}

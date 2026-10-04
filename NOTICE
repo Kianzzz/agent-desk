@@ -1,0 +1,12 @@
+Agent Desk
+Copyright (c) 2026 Agent Desk contributors
+
+本项目包含或改写了以下第三方内容：
+
+1. ThinkWatch Core / ThinkWatch Lite（MIT 许可证）
+   安全扫描的部分规则和代码移植自这两个项目，详见 crates/ad-security/NOTICE。
+
+2. LiteLLM 模型价格表（MIT 许可证，Copyright (c) 2023 Berri AI）
+   crates/ad-usage/data/pricing.json 是从
+   https://github.com/BerriAI/litellm 的 model_prices_and_context_window.json
+   过滤出的精简快照；运行时也可以联网更新到最新版。

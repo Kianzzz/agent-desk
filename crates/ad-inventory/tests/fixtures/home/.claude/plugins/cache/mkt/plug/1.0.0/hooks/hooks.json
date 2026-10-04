@@ -1,0 +1,16 @@
+{
+  "description": "格式化",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/fmt.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

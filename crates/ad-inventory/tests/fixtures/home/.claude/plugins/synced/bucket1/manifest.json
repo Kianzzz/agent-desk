@@ -1,0 +1,10 @@
+{
+  "plugins": [
+    {
+      "name": "syncp",
+      "version": "0007",
+      "marketplaceName": "kw",
+      "generation": 2
+    }
+  ]
+}

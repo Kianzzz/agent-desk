@@ -1,0 +1,54 @@
+{
+  "numStartups": 5,
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "env": {
+        "PW_TOKEN": "secret-token-123456"
+      }
+    },
+    "remote": {
+      "type": "http",
+      "url": "https://example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer sk-live-abcdef"
+      }
+    }
+  },
+  "projects": {
+    "__HOME__/proj": {
+      "allowedTools": [],
+      "mcpServers": {
+        "localsrv": {
+          "type": "stdio",
+          "command": "uvx",
+          "args": [
+            "mcp-server-git"
+          ]
+        }
+      },
+      "disabledMcpjsonServers": [
+        "projoff"
+      ]
+    },
+    "__HOME__/gone": {
+      "mcpServers": {
+        "orphan": {
+          "command": "node",
+          "args": [
+            "x.js"
+          ]
+        }
+      }
+    },
+    "__HOME__": {
+      "mcpServers": {}
+    }
+  },
+  "history": "很长的历史记录"
+}

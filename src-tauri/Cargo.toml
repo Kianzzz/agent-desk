@@ -1,0 +1,28 @@
+[package]
+name = "agent-desk"
+description = "本地 AI Agent 管理工具"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+name = "agent_desk_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-png"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+ad-usage = { path = "../crates/ad-usage" }
+ad-inventory = { path = "../crates/ad-inventory" }
+ad-security = { path = "../crates/ad-security" }
+ad-disk = { path = "../crates/ad-disk" }
+ad-quota = { path = "../crates/ad-quota" }

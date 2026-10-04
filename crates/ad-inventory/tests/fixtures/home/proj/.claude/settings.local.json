@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./local-stop.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

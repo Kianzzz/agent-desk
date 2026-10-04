@@ -1,0 +1,10 @@
+/target
+/target.nosync
+/node_modules
+/.pnpm.nosync
+/dist
+/src-tauri/gen
+.DS_Store
+*.log
+/src/mock-data
+/.claude

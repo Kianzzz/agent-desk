@@ -1,0 +1,8 @@
+{
+  "plugins": [
+    {
+      "plugin": "evil@mkt",
+      "reason": "security"
+    }
+  ]
+}

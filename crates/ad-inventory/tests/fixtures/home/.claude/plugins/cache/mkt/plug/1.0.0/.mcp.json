@@ -1,0 +1,11 @@
+{
+  "plugmcp": {
+    "command": "node",
+    "args": [
+      "server.js"
+    ],
+    "env": {
+      "PLUG_SECRET": "plug-secret-value"
+    }
+  }
+}

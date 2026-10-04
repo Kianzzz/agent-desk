@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "offmcp": {
+      "command": "node",
+      "args": [
+        "off.js"
+      ]
+    }
+  }
+}

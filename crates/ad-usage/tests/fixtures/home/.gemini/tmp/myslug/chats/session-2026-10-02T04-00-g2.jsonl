@@ -1,0 +1,6 @@
+{"sessionId":"g2","projectHash":"abc","startTime":"2026-10-02T04:00:00.000Z","lastUpdated":"2026-10-02T04:00:00.000Z","kind":"main"}
+{"id":"u1","timestamp":"2026-10-02T04:00:01.000Z","type":"user","content":[{"text":"展开后的长内容"}],"displayContent":[{"text":"总结一下"}]}
+{"$set":{"lastUpdated":"2026-10-02T04:00:01.000Z"}}
+{"id":"a1","timestamp":"2026-10-02T04:00:05.000Z","type":"gemini","content":"","model":"gemini-3-flash-preview","tokens":{"input":1000,"output":100,"cached":0,"thoughts":0,"tool":0,"total":1100}}
+{"$set":{"lastUpdated":"2026-10-02T04:00:05.000Z"}}
+{"id":"a1","timestamp":"2026-10-02T04:00:05.000Z","type":"gemini","content":"","model":"gemini-3-flash-preview","tokens":{"input":1000,"output":100,"cached":0,"thoughts":0,"tool":0,"total":1100},"toolCalls":[]}
