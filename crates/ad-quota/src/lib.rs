@@ -29,8 +29,12 @@ pub struct Window {
     pub resets_at: Option<String>,
     /// 这个数字是哪一刻记录下来的
     pub observed_at: String,
-    /// 刷新时间已过：额度已经重置，数字是旧的
+    /// 刷新时间已过：额度已经重置，数字是旧的（而且没法估算）
     pub expired: bool,
+    /// used_percent / resets_at 是按本地用量估算的（记录已经不新了）
+    pub estimated: bool,
+    /// 来源记下的原始百分比（没有估算时等于 used_percent）
+    pub recorded_percent: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,10 +53,16 @@ pub struct Account {
     pub hint: Option<String>,
 }
 
-/// `codex_quotas` 传 ad-usage 快照里的 `quotas`（只会用到 Codex 的）。
-pub fn accounts(home: &Path, state_dir: &Path, codex_quotas: &[ad_usage::QuotaWindow]) -> Vec<Account> {
+/// `codex_quotas` 传 ad-usage 快照里的 `quotas`（只会用到 Codex 的）；
+/// `claude_costs` 传快照里的 `claude_costs`，状态栏记录不新时用来估算 Claude 额度。
+pub fn accounts(
+    home: &Path,
+    state_dir: &Path,
+    codex_quotas: &[ad_usage::QuotaWindow],
+    claude_costs: &[(i64, f64)],
+) -> Vec<Account> {
     vec![
-        claude::account(home, state_dir),
+        claude::account(home, state_dir, claude_costs, chrono::Utc::now().timestamp_millis()),
         codex::account(home, codex_quotas),
         gemini::account(home),
     ]

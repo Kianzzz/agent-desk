@@ -4,11 +4,12 @@ use std::path::Path;
 
 use crate::{bridge, is_past, Account, Tool, Window};
 
-pub fn account(home: &Path, state_dir: &Path) -> Account {
+/// `costs`：最近几天每次 Claude 请求的（Unix 毫秒，折算美元），升序。
+pub fn account(home: &Path, state_dir: &Path, costs: &[(i64, f64)], now_ms: i64) -> Account {
     let profile = read_profile(home);
     let logged_in = profile.is_some();
     let plan = profile.as_ref().and_then(plan_label);
-    let (windows, observed) = read_windows(state_dir);
+    let (windows, observed) = read_windows(state_dir, costs, now_ms);
     let hint = if !logged_in || !windows.is_empty() {
         None
     } else {
@@ -73,7 +74,8 @@ fn capitalize(s: &str) -> String {
 }
 
 /// 读状态栏脚本记下的最后一份输入。返回额度窗口和记录时间。
-fn read_windows(state_dir: &Path) -> (Vec<Window>, Option<String>) {
+/// 记录不新时（超过 5 分钟），按记录之后的本地用量估算现在的值，见 [`estimate`]。
+fn read_windows(state_dir: &Path, costs: &[(i64, f64)], now_ms: i64) -> (Vec<Window>, Option<String>) {
     let path = bridge::last_path(state_dir);
     let Ok(text) = std::fs::read_to_string(&path) else { return (vec![], None) };
     let observed: DateTime<Utc> = std::fs::metadata(&path)
@@ -81,27 +83,105 @@ fn read_windows(state_dir: &Path) -> (Vec<Window>, Option<String>) {
         .map(DateTime::<Utc>::from)
         .unwrap_or_else(|_| Utc::now());
     let observed_at = observed.to_rfc3339();
+    let observed_ms = observed.timestamp_millis();
     let Ok(v) = serde_json::from_str::<Value>(&text) else { return (vec![], Some(observed_at)) };
     let Some(rl) = v.get("rate_limits") else { return (vec![], Some(observed_at)) };
     let mut out = Vec::new();
-    for (key, kind, label) in [("five_hour", "fiveHour", "5 小时"), ("seven_day", "weekly", "本周")] {
+    for (key, kind, label, dur_ms) in [
+        ("five_hour", "fiveHour", "5 小时", FIVE_HOURS),
+        ("seven_day", "weekly", "本周", SEVEN_DAYS),
+    ] {
         let Some(w) = rl.get(key) else { continue };
         let Some(used) = w.get("used_percentage").and_then(Value::as_f64) else { continue };
-        let resets_at = w
-            .get("resets_at")
-            .and_then(Value::as_i64)
-            .and_then(|s| Utc.timestamp_opt(s, 0).single())
-            .map(|t| t.to_rfc3339());
+        let resets_ms = w.get("resets_at").and_then(Value::as_i64).map(|s| s * 1000);
+        let rec = Recorded { pct: used, resets_ms, observed_ms, dur_ms };
+        let (pct, resets, estimated) = match estimate(&rec, costs, now_ms) {
+            Some(e) => (e.pct, e.resets_ms, true),
+            None => (used, resets_ms, false),
+        };
+        let resets_at = resets.and_then(|ms| Utc.timestamp_millis_opt(ms).single()).map(|t| t.to_rfc3339());
         out.push(Window {
             kind: kind.into(),
             label: label.into(),
-            used_percent: used,
-            expired: is_past(resets_at.as_deref()),
+            used_percent: pct,
+            expired: !estimated && is_past(resets_at.as_deref()),
             resets_at,
             observed_at: observed_at.clone(),
+            estimated,
+            recorded_percent: used,
         });
     }
     (out, Some(observed_at))
+}
+
+const FIVE_HOURS: i64 = 5 * 3_600_000;
+const SEVEN_DAYS: i64 = 7 * 86_400_000;
+/// 记录在这么久以内算新的，直接用
+const FRESH_MS: i64 = 5 * 60_000;
+
+struct Recorded {
+    pct: f64,
+    resets_ms: Option<i64>,
+    observed_ms: i64,
+    dur_ms: i64,
+}
+
+#[derive(Debug, PartialEq)]
+struct Estimate {
+    pct: f64,
+    /// 新窗口还没开始时为 None
+    resets_ms: Option<i64>,
+}
+
+fn cost_between(costs: &[(i64, f64)], from: i64, to: i64) -> f64 {
+    costs.iter().filter(|(t, _)| *t >= from && *t < to).map(|(_, c)| c).sum()
+}
+
+/// 估算现在的额度。额度大致按算力扣，这里用折算费用代替算力：
+/// - 还在记录的那个窗口里：记录的百分比 × 窗口开始到现在的费用 ÷ 窗口开始到记录时的费用
+/// - 窗口已经重置：用记录算出「每 1% 额度对应多少费用」，再看新窗口里花了多少
+///
+/// 记录太新、或者记录里的用量太少（比例不可靠）时返回 None，界面照原样显示记录值。
+fn estimate(rec: &Recorded, costs: &[(i64, f64)], now_ms: i64) -> Option<Estimate> {
+    if now_ms - rec.observed_ms < FRESH_MS {
+        return None;
+    }
+    let resets = rec.resets_ms?;
+    let start = resets - rec.dur_ms;
+    let c_obs = cost_between(costs, start, rec.observed_ms);
+    if now_ms < resets {
+        if rec.pct < 1.0 || c_obs < 0.5 {
+            return None;
+        }
+        let c_now = cost_between(costs, start, now_ms + 1);
+        return Some(Estimate { pct: (rec.pct * c_now / c_obs).min(100.0), resets_ms: Some(resets) });
+    }
+    // 窗口已经重置
+    if rec.pct < 2.0 || c_obs < 0.5 {
+        return None;
+    }
+    let per_pct = c_obs / rec.pct;
+    let (new_start, new_end) = if rec.dur_ms == SEVEN_DAYS {
+        // 每周额度按固定节奏重置
+        let k = (now_ms - resets) / SEVEN_DAYS;
+        let s = resets + k * SEVEN_DAYS;
+        (s, s + SEVEN_DAYS)
+    } else {
+        // 5 小时额度从重置后的第一次请求开始计时（取整到整点）
+        let mut from = resets;
+        loop {
+            let Some(&(first, _)) = costs.iter().find(|(t, _)| *t >= from) else {
+                return Some(Estimate { pct: 0.0, resets_ms: None });
+            };
+            let s = first - first.rem_euclid(3_600_000);
+            if now_ms < s + rec.dur_ms {
+                break (s, s + rec.dur_ms);
+            }
+            from = s + rec.dur_ms;
+        }
+    };
+    let spent = cost_between(costs, new_start, now_ms + 1);
+    Some(Estimate { pct: (spent / per_pct).min(100.0), resets_ms: Some(new_end) })
 }
 
 #[cfg(test)]
@@ -125,7 +205,7 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let state = tempfile::tempdir().unwrap();
         std::fs::write(home.path().join(".claude.json"), r#"{"numStartups": 3}"#).unwrap();
-        let a = account(home.path(), state.path());
+        let a = account(home.path(), state.path(), &[], Utc::now().timestamp_millis());
         assert!(!a.logged_in);
         assert!(a.hint.is_none());
     }
@@ -150,7 +230,7 @@ mod tests {
             .to_string(),
         )
         .unwrap();
-        let a = account(home.path(), state.path());
+        let a = account(home.path(), state.path(), &[], Utc::now().timestamp_millis());
         assert!(a.logged_in);
         assert_eq!(a.plan.as_deref(), Some("Max 5x"));
         assert_eq!(a.windows.len(), 2);
@@ -167,8 +247,62 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let state = tempfile::tempdir().unwrap();
         std::fs::write(home.path().join(".claude.json"), r#"{"oauthAccount":{"organizationType":"claude_pro"}}"#).unwrap();
-        let a = account(home.path(), state.path());
+        let a = account(home.path(), state.path(), &[], Utc::now().timestamp_millis());
         assert!(a.windows.is_empty());
         assert!(a.hint.unwrap().contains("还没接入"));
+    }
+
+    const H: i64 = 3_600_000;
+
+    fn rec(pct: f64, resets_ms: i64, observed_ms: i64, dur_ms: i64) -> Recorded {
+        Recorded { pct, resets_ms: Some(resets_ms), observed_ms, dur_ms }
+    }
+
+    #[test]
+    fn fresh_record_is_used_as_is() {
+        let costs = [(0, 10.0)];
+        assert_eq!(estimate(&rec(50.0, 100 * H, 10 * H, SEVEN_DAYS), &costs, 10 * H + 60_000), None);
+    }
+
+    #[test]
+    fn same_window_scales_by_cost() {
+        // 记录时窗口内花了 $100、记 50%；之后又花了 $20 → 约 60%
+        let start = 200 * H - SEVEN_DAYS;
+        let costs = [(start + H, 60.0), (start + 2 * H, 40.0), (start + 30 * H, 20.0)];
+        let e = estimate(&rec(50.0, 200 * H, start + 10 * H, SEVEN_DAYS), &costs, start + 40 * H).unwrap();
+        assert!((e.pct - 60.0).abs() < 1e-9);
+        assert_eq!(e.resets_ms, Some(200 * H));
+    }
+
+    #[test]
+    fn weekly_after_reset_uses_cost_per_percent() {
+        // 上个窗口 $100 = 50%，即 $2/1%；新窗口里花了 $30 → 15%
+        let reset = 200 * H;
+        let start = reset - SEVEN_DAYS;
+        let costs = [(start + H, 100.0), (reset + H, 30.0)];
+        let e = estimate(&rec(50.0, reset, start + 5 * H, SEVEN_DAYS), &costs, reset + 3 * H).unwrap();
+        assert!((e.pct - 15.0).abs() < 1e-9);
+        assert_eq!(e.resets_ms, Some(reset + SEVEN_DAYS));
+    }
+
+    #[test]
+    fn five_hour_after_reset_starts_at_first_request() {
+        let reset = 100 * H;
+        let costs = [(reset - 2 * H, 10.0), (reset + 3 * H + 1234, 4.0)];
+        // 记录：上个 5 小时窗口里 $10 = 20%（$0.5/1%）
+        let e = estimate(&rec(20.0, reset, reset - H, FIVE_HOURS), &costs, reset + 4 * H).unwrap();
+        assert!((e.pct - 8.0).abs() < 1e-9);
+        // 新窗口从 reset+3h 的整点开始，5 小时后重置
+        assert_eq!(e.resets_ms, Some(reset + 3 * H + FIVE_HOURS));
+        // 重置后还没用过：0%，新窗口没开始
+        let e = estimate(&rec(20.0, reset, reset - H, FIVE_HOURS), &costs[..1], reset + 4 * H).unwrap();
+        assert_eq!(e, Estimate { pct: 0.0, resets_ms: None });
+    }
+
+    #[test]
+    fn too_little_data_gives_up() {
+        let start = 200 * H - SEVEN_DAYS;
+        let costs = [(start + H, 0.1)];
+        assert_eq!(estimate(&rec(50.0, 200 * H, start + 10 * H, SEVEN_DAYS), &costs, start + 40 * H), None);
     }
 }

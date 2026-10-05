@@ -16,15 +16,19 @@ export function SegBar({ value, segments = 10, stale }: { value: number; segment
 }
 
 export function QuotaRow({ w, segments }: { w: QuotaWin; segments?: number }) {
+  const notStarted = w.estimated && !w.resetsAt;
+  const tip = w.estimated
+    ? `${ago(w.observedAt)}记录的是 ${pct(w.recordedPercent)}，之后按本地用量估算；在终端里用一次 Claude Code 会更新成准确值`
+    : `记录于 ${ago(w.observedAt)}`;
   return (
-    <div className="q-bar">
+    <div className="q-bar" title={tip}>
       <SegBar value={w.expired ? 0 : w.usedPercent} segments={segments} stale={w.expired} />
       <div className="seg-meta">
         <span>
-          {w.label} <b>{w.expired ? "已重置" : pct(w.usedPercent)}</b>
+          {w.label} <b>{w.expired ? "已重置" : (w.estimated ? "≈ " : "") + pct(w.usedPercent)}</b>
         </span>
         <span className="r" title={w.resetsAt ? new Date(w.resetsAt).toLocaleString() : undefined}>
-          {w.expired ? `记录于 ${ago(w.observedAt)}` : resetText(w.resetsAt)}
+          {w.expired ? `记录于 ${ago(w.observedAt)}` : notStarted ? "下次使用后开始计时" : resetText(w.resetsAt)}
         </span>
       </div>
     </div>

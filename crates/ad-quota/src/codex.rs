@@ -20,6 +20,8 @@ pub fn account(home: &Path, quotas: &[ad_usage::QuotaWindow]) -> Account {
                 expired: is_past(q.resets_at.as_deref()),
                 resets_at: q.resets_at.clone(),
                 observed_at: q.observed_at.clone(),
+                estimated: false,
+                recorded_percent: q.used_percent,
             }
         })
         .collect();

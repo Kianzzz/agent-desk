@@ -83,11 +83,11 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
       return [
         { tool: "claude", loggedIn: true, loginKind: "Claude 订阅", plan: "Max 5x", quotaSource: "Claude Code 状态栏", hint: null,
           windows: [
-            { kind: "fiveHour", label: "5 小时", usedPercent: 42, resetsAt: new Date(Date.now() + 2.2 * 3600000).toISOString(), observedAt: new Date().toISOString(), expired: false },
-            { kind: "weekly", label: "本周", usedPercent: 18, resetsAt: new Date(Date.now() + 3 * 86400000).toISOString(), observedAt: new Date().toISOString(), expired: false },
+            { kind: "fiveHour", label: "5 小时", usedPercent: 42, resetsAt: new Date(Date.now() + 2.2 * 3600000).toISOString(), observedAt: new Date().toISOString(), expired: false, estimated: false, recordedPercent: 0 },
+            { kind: "weekly", label: "本周", usedPercent: 18, resetsAt: new Date(Date.now() + 3 * 86400000).toISOString(), observedAt: new Date().toISOString(), expired: false, estimated: false, recordedPercent: 0 },
           ] },
         { tool: "codex", loggedIn: true, loginKind: "ChatGPT 账号", plan: "Pro", quotaSource: "Codex 会话日志", hint: null,
-          windows: [{ kind: "weekly", label: "本周", usedPercent: 1, resetsAt: new Date(Date.now() + 5 * 86400000).toISOString(), observedAt: new Date().toISOString(), expired: false }] },
+          windows: [{ kind: "weekly", label: "本周", usedPercent: 1, resetsAt: new Date(Date.now() + 5 * 86400000).toISOString(), observedAt: new Date().toISOString(), expired: false, estimated: false, recordedPercent: 0 }] },
         { tool: "gemini", loggedIn: true, loginKind: "Google 账号", plan: null, quotaSource: null, hint: "Gemini CLI 不在本机记录账号等级和额度", windows: [] },
       ];
     case "claude_bridge_status":

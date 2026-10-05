@@ -117,8 +117,12 @@ export interface QuotaWin {
   usedPercent: number;
   resetsAt: string | null;
   observedAt: string;
-  /** 刷新时间已过，数字是旧的 */
+  /** 刷新时间已过，数字是旧的（而且没法估算） */
   expired: boolean;
+  /** usedPercent / resetsAt 是按记录之后的本地用量估算的 */
+  estimated: boolean;
+  /** 来源记下的原始百分比 */
+  recordedPercent: number;
 }
 
 export interface Account {

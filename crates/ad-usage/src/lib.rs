@@ -184,6 +184,10 @@ pub struct UsageSnapshot {
     pub sources: Vec<SourceStatus>,
     pub pricing_updated_at: Option<String>,
     pub unpriced_models: Vec<String>,
+    /// 最近 8 天每次 Claude 请求的（Unix 毫秒，折算美元），按时间升序、已去重。
+    /// 只在进程内用（估算 Claude 额度），不序列化给界面。
+    #[serde(skip)]
+    pub claude_costs: Vec<(i64, f64)>,
 }
 
 pub struct UsageEngine {

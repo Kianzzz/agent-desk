@@ -64,8 +64,13 @@ pub async fn update_pricing(app: AppHandle) -> CmdResult<usize> {
 
 #[tauri::command]
 pub fn get_accounts(state: State<'_, AppState>) -> Vec<ad_quota::Account> {
-    let quotas = state.usage.read().unwrap().as_ref().map(|s| s.quotas.clone()).unwrap_or_default();
-    ad_quota::accounts(&state.home, &state.state_dir, &quotas)
+    let usage = state.usage.read().unwrap();
+    let (quotas, costs) = usage
+        .as_ref()
+        .map(|s| (s.quotas.clone(), s.claude_costs.clone()))
+        .unwrap_or_default();
+    drop(usage);
+    ad_quota::accounts(&state.home, &state.state_dir, &quotas, &costs)
 }
 
 #[tauri::command]

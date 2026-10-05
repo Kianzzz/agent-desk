@@ -458,6 +458,14 @@ pub(crate) fn build(
     let active_blocks: Vec<ActiveBlock> =
         active_block(&mut claude_recs, now_ms).into_iter().collect();
 
+    let since = now_ms - 8 * 86_400_000;
+    let mut claude_costs: Vec<(i64, f64)> = claude_recs
+        .iter()
+        .filter(|(ts, _, _)| *ts >= since)
+        .map(|(ts, cost, _)| (*ts, cost.unwrap_or(0.0)))
+        .collect();
+    claude_costs.sort_by_key(|(ts, _)| *ts);
+
     let sources: Vec<SourceStatus> = sources_in
         .into_iter()
         .map(|s| {
@@ -485,5 +493,6 @@ pub(crate) fn build(
         sources,
         pricing_updated_at: pricing.fetched_at.clone(),
         unpriced_models: unpriced.into_iter().map(str::to_string).collect(),
+        claude_costs,
     }
 }

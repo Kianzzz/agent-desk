@@ -77,7 +77,8 @@ export function AccountCard({ a, today, month, onChanged }: { a: Account; today?
         </span>
         {a.quotaSource && observed && (
           <span style={{ marginLeft: "auto" }} title={a.quotaSource}>
-            额度更新于 {ago(observed)}
+            额度记录于 {ago(observed)}
+            {a.windows.some((w) => w.estimated) ? "，之后按本地用量估算" : ""}
           </span>
         )}
       </div>
