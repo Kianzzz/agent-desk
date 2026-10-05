@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "ad-disk"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -21,7 +21,7 @@ dependencies = [
 
 [[package]]
 name = "ad-inventory"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "ad-quota"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ad-usage",
  "anyhow",
@@ -52,7 +52,7 @@ dependencies = [
 
 [[package]]
 name = "ad-security"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -68,7 +68,7 @@ dependencies = [
 
 [[package]]
 name = "ad-usage"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -94,7 +94,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agent-desk"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ad-disk",
  "ad-inventory",

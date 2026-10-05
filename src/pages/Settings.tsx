@@ -1,6 +1,6 @@
 import { FolderOpen, Power } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, inTauri } from "../api";
 import { ErrorBox, Loading, Segmented, Spinner, Toggle } from "../components/ui";
 import { useSettings } from "../lib/hooks";
 import type { BridgeStatus, Settings, Theme } from "../types";
@@ -11,12 +11,16 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [bridge, setBridge] = useState<BridgeStatus | null>(null);
   const [bridgeBusy, setBridgeBusy] = useState(false);
+  const [version, setVersion] = useState("");
 
   useEffect(() => {
     if (saved) setS(saved);
   }, [saved]);
   useEffect(() => {
     api.claudeBridgeStatus().then(setBridge).catch(() => setBridge(null));
+    if (inTauri) {
+      import("@tauri-apps/api/app").then(({ getVersion }) => getVersion().then(setVersion)).catch(() => {});
+    }
   }, []);
 
   if (!s) {
@@ -145,7 +149,7 @@ export function SettingsPage() {
       </Group>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24 }}>
-        <span className="label">Agent Desk 0.2.0 · 所有数据只在本机处理</span>
+        <span className="label">Agent Desk {version} · 所有数据只在本机处理</span>
         <button className="btn" onClick={() => api.quit()}>
           <Power size={12} /> 退出 Agent Desk
         </button>
