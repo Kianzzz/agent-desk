@@ -1,14 +1,41 @@
-import { ChevronDown, ChevronRight, FolderOpen, RefreshCw, Sparkles, Trash2, FolderSearch, FolderX } from "lucide-react";
+import { ChevronDown, ChevronRight, FolderOpen, RefreshCw, Sparkles, Trash2, FolderSearch, FolderX, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import { Confirm, ErrorBox, Loading, SafetyBadge, Segmented, Spinner, Toast, useToast } from "../components/ui";
+import { Confirm, ErrorBox, Loading, SafetyBadge, safetyLabel, Segmented, Spinner, Toast, useToast } from "../components/ui";
 import { ago, bytes, daysSince, tildify } from "../lib/format";
 import { useAction, useDisk } from "../lib/hooks";
 import type { Assessment, AssessInput, DiskItem, DiskReport, ProjectUsage, Safety } from "../types";
 
 type View = "location" | "project";
+/** 顶部三个数字块对应的筛选；all 表示不筛。 */
+type Filter = "all" | "safe" | "review" | "keep";
 
 const deletable = (it: DiskItem) => it.safety !== "protected" && !it.inUse;
+
+/** 叶子项归到哪个数字块：正在写入和受保护的都算「建议保留」，三块加起来正好是全部。 */
+function bucket(it: DiskItem): Exclude<Filter, "all"> {
+  if (it.inUse || it.safety === "keep" || it.safety === "protected") return "keep";
+  return it.safety;
+}
+
+const matches = (it: DiskItem, f: Filter) => f === "all" || bucket(it) === f;
+
+/** 只保留符合筛选的叶子；目录的大小改成剩下叶子的合计，没剩下的目录整个去掉。 */
+function prune(it: DiskItem, f: Filter): DiskItem | null {
+  if (f === "all") return it;
+  if (!it.children.length) return matches(it, f) ? it : null;
+  const children = it.children.map((c) => prune(c, f)).filter((c): c is DiskItem => c !== null);
+  if (!children.length) return null;
+  return { ...it, children, sizeBytes: children.reduce((a, c) => a + c.sizeBytes, 0) };
+}
+
+function pruneAll(items: DiskItem[], f: Filter): DiskItem[] {
+  if (f === "all") return items;
+  return items
+    .map((it) => prune(it, f))
+    .filter((it): it is DiskItem => it !== null)
+    .sort((a, b) => b.sizeBytes - a.sizeBytes);
+}
 
 /** 叶子节点（真正可以勾选删除的项）。 */
 function leaves(items: DiskItem[]): DiskItem[] {
@@ -23,6 +50,7 @@ function allItems(report: DiskReport): DiskItem[] {
 export function Cleanup() {
   const [report, reload] = useDisk();
   const [view, setView] = useState<View>("location");
+  const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Map<string, DiskItem>>(new Map());
   const [verdicts, setVerdicts] = useState<Map<string, Assessment>>(new Map());
   const [confirming, setConfirming] = useState(false);
@@ -189,7 +217,14 @@ export function Cleanup() {
     );
   }
 
-  const bySafety = (s: Safety) => leaves(report.locations).filter((it) => it.safety === s && (s !== "safe" || !it.inUse)).reduce((a, it) => a + it.sizeBytes, 0);
+  const byBucket = (f: Exclude<Filter, "all">) => leaves(report.locations).filter((it) => bucket(it) === f).reduce((a, it) => a + it.sizeBytes, 0);
+  // 再点一次已选中的块，回到全部
+  const pick = (f: Filter) => setFilter(filter === f || f === "all" ? "all" : f);
+  const locations = pruneAll(report.locations, filter);
+  const projects =
+    filter === "all"
+      ? report.projects
+      : report.projects.filter((p) => [...leaves(p.artifacts), ...p.transcripts].some((it) => matches(it, filter)));
   const usedPct = ((report.diskTotalBytes - report.diskFreeBytes) / report.diskTotalBytes) * 100;
   const scannedProjects = report.projects.some((p) => p.folderBytes !== null);
 
@@ -199,16 +234,16 @@ export function Cleanup() {
       <ErrorBox error={scan.error} />
 
       <div className="grid cols-4">
-        <div className="card card-pad">
+        <button className={"card card-pad stat-btn" + (filter === "all" ? " active" : "")} aria-pressed={filter === "all"} title="显示全部" onClick={() => pick("all")}>
           <div className="stat-label">AI 工具共占用</div>
           <div className="stat-value">{bytes(report.totalAiBytes)}</div>
           <div className="stat-sub">
             磁盘已用 {usedPct.toFixed(0)}%，剩余 {bytes(report.diskFreeBytes)}
           </div>
-        </div>
-        <SafetyStat s="safe" v={bySafety("safe")} sub="缓存和能重新生成的东西" />
-        <SafetyStat s="review" v={bySafety("review")} sub="对话记录、生成的图片等" />
-        <SafetyStat s="keep" v={bySafety("keep") + bySafety("protected")} sub="最近在用的、数据库和登录信息" />
+        </button>
+        <SafetyStat s="safe" v={byBucket("safe")} sub="缓存和能重新生成的东西" active={filter === "safe"} onClick={() => pick("safe")} />
+        <SafetyStat s="review" v={byBucket("review")} sub="对话记录、生成的图片等" active={filter === "review"} onClick={() => pick("review")} />
+        <SafetyStat s="keep" v={byBucket("keep")} sub="最近在用的、数据库和登录信息" active={filter === "keep"} onClick={() => pick("keep")} />
       </div>
 
       <div className="toolbar section">
@@ -217,9 +252,17 @@ export function Cleanup() {
           onChange={setView}
           options={[
             { value: "location", label: "按位置" },
-            { value: "project", label: `按项目（${report.projects.length}）` },
+            { value: "project", label: `按项目（${projects.length}）` },
           ]}
         />
+        {filter !== "all" && (
+          <span className="filter-chip">
+            只看「{safetyLabel(filter)}」
+            <button className="icon-btn" title="显示全部" onClick={() => setFilter("all")}>
+              <X size={12} />
+            </button>
+          </span>
+        )}
         <span className="spacer" />
         <button className="btn" disabled={assess.busy} onClick={() => runAssess(selected.size ? [...selected.values()] : reviewCandidates())} title="用你本机的 Claude 订阅（haiku 模型）判断，只发送路径、大小、时间和标题，不发送文件内容">
           {assess.busy ? <Spinner size={12} /> : <Sparkles size={13} />}
@@ -235,9 +278,10 @@ export function Cleanup() {
 
       {view === "location" ? (
         <div className="card">
-          {report.locations.map((it) => (
-            <TreeRow key={it.id} it={it} depth={0} selected={selected} verdicts={verdicts} onToggle={toggle} onToggleMany={toggleMany} max={report.locations[0]?.sizeBytes ?? 1} />
+          {locations.map((it) => (
+            <TreeRow key={it.id} it={it} depth={0} selected={selected} verdicts={verdicts} onToggle={toggle} onToggleMany={toggleMany} max={locations[0]?.sizeBytes ?? 1} />
           ))}
+          {locations.length === 0 && <div className="empty">没有「{safetyLabel(filter as Safety)}」的项</div>}
         </div>
       ) : (
         <>
@@ -248,9 +292,10 @@ export function Cleanup() {
             </div>
           )}
           <div className="grid">
-            {report.projects.map((p) => (
-              <ProjectCard key={p.project} p={p} selected={selected} verdicts={verdicts} onToggle={toggle} onToggleMany={toggleMany} />
+            {projects.map((p) => (
+              <ProjectCard key={p.project} p={p} filter={filter} selected={selected} verdicts={verdicts} onToggle={toggle} onToggleMany={toggleMany} />
             ))}
+            {projects.length === 0 && <div className="card empty">没有项目含「{safetyLabel(filter as Safety)}」的项</div>}
           </div>
         </>
       )}
@@ -306,15 +351,20 @@ export function Cleanup() {
   );
 }
 
-function SafetyStat({ s, v, sub }: { s: Safety; v: number; sub: string }) {
+function SafetyStat({ s, v, sub, active, onClick }: { s: Safety; v: number; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <div className="card card-pad">
+    <button
+      className={"card card-pad stat-btn" + (active ? " active" : "")}
+      aria-pressed={active}
+      title={active ? "再点一次显示全部" : `只看「${safetyLabel(s)}」的项`}
+      onClick={onClick}
+    >
       <SafetyBadge s={s} />
       <div className="stat-value" style={{ marginTop: 6 }}>
         {bytes(v)}
       </div>
       <div className="stat-sub">{sub}</div>
-    </div>
+    </button>
   );
 }
 
@@ -432,11 +482,14 @@ function TreeRow({ it, depth, max, ...p }: RowProps & { it: DiskItem; depth: num
   );
 }
 
-function ProjectCard({ p, ...rp }: RowProps & { p: ProjectUsage }) {
+function ProjectCard({ p, filter, ...rp }: RowProps & { p: ProjectUsage; filter: Filter }) {
   const [open, setOpen] = useState(false);
-  const items = [...leaves(p.artifacts), ...p.transcripts];
+  const artifacts = pruneAll(p.artifacts, filter);
+  const transcripts = p.transcripts.filter((it) => matches(it, filter));
+  const items = [...leaves(artifacts), ...transcripts];
   const cleanable = items.filter(deletable);
-  const safeBytes = items.filter((it) => it.safety === "safe" && !it.inUse).reduce((a, it) => a + it.sizeBytes, 0);
+  const safeBytes = items.filter((it) => bucket(it) === "safe").reduce((a, it) => a + it.sizeBytes, 0);
+  const matchedBytes = items.reduce((a, it) => a + it.sizeBytes, 0);
   return (
     <div className="card">
       <div className="row" style={{ cursor: "pointer", borderBottom: open ? undefined : 0 }} onClick={() => setOpen(!open)}>
@@ -469,19 +522,25 @@ function ProjectCard({ p, ...rp }: RowProps & { p: ProjectUsage }) {
             {p.folderBytes !== null ? ` · 文件夹 ${bytes(p.folderBytes)}` : ""}
           </div>
         </div>
-        {safeBytes > 0 && <span className="badge good">可放心删 {bytes(safeBytes)}</span>}
+        {filter === "all" ? (
+          safeBytes > 0 && <span className="badge good">可放心删 {bytes(safeBytes)}</span>
+        ) : (
+          <span className={"badge " + (filter === "safe" ? "good" : filter === "review" ? "warning" : "accent")}>
+            {safetyLabel(filter)} {bytes(matchedBytes)}
+          </span>
+        )}
       </div>
       {open && (
         <div>
-          {p.artifacts.length > 0 && (
+          {artifacts.length > 0 && (
             <>
               <div className="group-head">
                 构建产物与 worktree
-                <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => rp.onToggleMany(leaves(p.artifacts), true)}>
+                <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => rp.onToggleMany(leaves(artifacts), true)}>
                   全选可删的
                 </button>
               </div>
-              {p.artifacts.map((it) =>
+              {artifacts.map((it) =>
                 it.children.length ? (
                   <TreeRow key={it.id} it={it} depth={1} max={it.sizeBytes} {...rp} />
                 ) : (
@@ -490,15 +549,17 @@ function ProjectCard({ p, ...rp }: RowProps & { p: ProjectUsage }) {
               )}
             </>
           )}
-          <div className="group-head">
-            对话记录 · {p.transcripts.length}
-            {cleanable.length > 0 && (
-              <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => rp.onToggleMany(p.transcripts.filter((t) => t.safety === "safe"), true)}>
-                勾选可放心删的
-              </button>
-            )}
-          </div>
-          {[...p.transcripts]
+          {transcripts.length > 0 && (
+            <div className="group-head">
+              对话记录 · {transcripts.length}
+              {cleanable.length > 0 && transcripts.some((t) => bucket(t) === "safe") && (
+                <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => rp.onToggleMany(transcripts.filter((t) => bucket(t) === "safe"), true)}>
+                  勾选可放心删的
+                </button>
+              )}
+            </div>
+          )}
+          {[...transcripts]
             .sort((a, b) => b.modified.localeCompare(a.modified))
             .map((it) => (
               <LeafRow key={it.id} it={it} {...rp} />
