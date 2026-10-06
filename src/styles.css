@@ -996,6 +996,11 @@ input[type="checkbox"] {
   border-bottom: 0;
 }
 
+/* 列表限高滚动时，行不能被压扁（否则标题和副标题会叠在一起） */
+.list > .row {
+  flex-shrink: 0;
+}
+
 .row:hover {
   background: var(--surface-2);
 }

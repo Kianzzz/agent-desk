@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FolderOpen, RefreshCw, Sparkles, Trash2, FolderSearch, FolderX } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { Confirm, ErrorBox, Loading, SafetyBadge, Segmented, Spinner, Toast, useToast } from "../components/ui";
 import { ago, bytes, daysSince, tildify } from "../lib/format";
@@ -43,10 +43,31 @@ export function Cleanup() {
     return m;
   }, [report]);
 
-  const toggle = (it: DiskItem, on?: boolean) => {
+  // 上一次点过的勾选框，按住 Shift 再点另一个时，把两者之间（按界面上的顺序）一起选上或取消
+  const lastClicked = useRef<string | null>(null);
+
+  const toggle = (it: DiskItem, shift = false) => {
     if (!deletable(it)) return;
     const next = new Map(selected);
-    const want = on ?? !next.has(it.id);
+    const want = !next.has(it.id);
+    const anchor = lastClicked.current;
+    lastClicked.current = it.id;
+    if (shift && anchor && anchor !== it.id) {
+      // 只看当前展开、显示在界面上的勾选框，顺序就是用户看到的顺序
+      const ids = [...document.querySelectorAll<HTMLInputElement>("input[data-item-id]")].map((el) => el.dataset.itemId!);
+      const a = ids.indexOf(anchor);
+      const b = ids.indexOf(it.id);
+      if (a >= 0 && b >= 0) {
+        for (const id of ids.slice(Math.min(a, b), Math.max(a, b) + 1)) {
+          const x = index.get(id);
+          if (!x || !deletable(x)) continue;
+          if (want) next.set(id, x);
+          else next.delete(id);
+        }
+        setSelected(next);
+        return;
+      }
+    }
     if (want) next.set(it.id, it);
     else next.delete(it.id);
     setSelected(next);
@@ -242,6 +263,7 @@ export function Cleanup() {
           <button className="btn ghost sm" onClick={() => setSelected(new Map())}>
             清除选择
           </button>
+          <span className="label">按住 Shift 再点另一项，可以连选中间所有项</span>
           <span className="spacer" style={{ flex: 1 }} />
           <button className="btn danger" onClick={() => setConfirming(true)}>
             <Trash2 size={13} /> 移到废纸篓
@@ -299,7 +321,7 @@ function SafetyStat({ s, v, sub }: { s: Safety; v: number; sub: string }) {
 interface RowProps {
   selected: Map<string, DiskItem>;
   verdicts: Map<string, Assessment>;
-  onToggle: (it: DiskItem, on?: boolean) => void;
+  onToggle: (it: DiskItem, shift?: boolean) => void;
   onToggleMany: (items: DiskItem[], on: boolean) => void;
 }
 
@@ -315,7 +337,7 @@ function Verdict({ v }: { v: Assessment | undefined }) {
   );
 }
 
-function Check({ it, selected, onToggle }: { it: DiskItem; selected: Map<string, DiskItem>; onToggle: (it: DiskItem) => void }) {
+function Check({ it, selected, onToggle }: { it: DiskItem; selected: Map<string, DiskItem>; onToggle: (it: DiskItem, shift?: boolean) => void }) {
   const can = deletable(it);
   return (
     <input
@@ -323,8 +345,12 @@ function Check({ it, selected, onToggle }: { it: DiskItem; selected: Map<string,
       checked={selected.has(it.id)}
       disabled={!can}
       title={can ? "" : it.inUse ? "正在写入，不能删" : "受保护，不能在这里删"}
-      onChange={() => onToggle(it)}
-      onClick={(e) => e.stopPropagation()}
+      data-item-id={it.id}
+      onChange={() => {}}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle(it, e.shiftKey);
+      }}
       style={{ flex: "none" }}
     />
   );
