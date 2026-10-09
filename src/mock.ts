@@ -81,7 +81,7 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
       return { snapshot: (await loadReal<UsageSnapshot>("usage")) ?? fakeUsage(), error: null };
     case "get_accounts":
       return [
-        { tool: "claude", loggedIn: true, loginKind: "Claude 订阅", plan: "Max 5x", quotaSource: "Claude Code 状态栏", hint: null,
+        { tool: "claude", loggedIn: true, loginKind: "Claude 订阅", plan: "Max 5x", quotaSource: "Claude 桌面版", hint: null,
           windows: [
             { kind: "fiveHour", label: "5 小时", usedPercent: 42, resetsAt: new Date(Date.now() + 2.2 * 3600000).toISOString(), observedAt: new Date().toISOString(), expired: false, estimated: false, recordedPercent: 0 },
             { kind: "weekly", label: "本周", usedPercent: 18, resetsAt: new Date(Date.now() + 3 * 86400000).toISOString(), observedAt: new Date().toISOString(), expired: false, estimated: false, recordedPercent: 0 },

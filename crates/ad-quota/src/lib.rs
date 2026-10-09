@@ -1,8 +1,9 @@
 //! 各 AI 的登录状态、账号等级和订阅额度。
 //!
 //! 全部来自本机文件，不联网：
-//! - Claude：等级读 `~/.claude.json` 的 `oauthAccount`；额度读 Claude Code 交给状态栏的
-//!   `rate_limits`，由 [`bridge`] 装的状态栏脚本记到 `<state_dir>/claude/last.json`。
+//! - Claude：等级读 `~/.claude.json` 的 `oauthAccount`；额度取两处里较新的官方读数：Claude 桌面版
+//!   记的 `plan-usage-history.json`，以及 Claude Code 交给状态栏的 `rate_limits`（由 [`bridge`]
+//!   装的状态栏脚本记到 `<state_dir>/claude/last.json`）。
 //! - Codex：等级从 `~/.codex/auth.json` 里 ID token 的声明解出（只取套餐字段，不保存、不外发
 //!   任何凭据）；额度由 ad-usage 从会话日志里读出后传进来。
 //! - Gemini：`~/.gemini/settings.json` 只记录登录方式，等级和额度本机没有。
@@ -47,14 +48,14 @@ pub struct Account {
     /// 「Max 5x」「Pro」「Plus」
     pub plan: Option<String>,
     pub windows: Vec<Window>,
-    /// 额度数据来自哪里，如「Claude Code 状态栏」「Codex 会话日志」
+    /// 额度数据来自哪里，如「Claude 桌面版」「Codex 会话日志」
     pub quota_source: Option<String>,
     /// 没有额度时告诉用户为什么、怎么才会有
     pub hint: Option<String>,
 }
 
 /// `codex_quotas` 传 ad-usage 快照里的 `quotas`（只会用到 Codex 的）；
-/// `claude_costs` 传快照里的 `claude_costs`，状态栏记录不新时用来估算 Claude 额度。
+/// `claude_costs` 传快照里的 `claude_costs`，Claude 额度读数不新时用来估算现在的值。
 pub fn accounts(
     home: &Path,
     state_dir: &Path,

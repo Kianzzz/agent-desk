@@ -458,7 +458,7 @@ pub(crate) fn build(
     let active_blocks: Vec<ActiveBlock> =
         active_block(&mut claude_recs, now_ms).into_iter().collect();
 
-    let since = now_ms - 8 * 86_400_000;
+    let since = now_ms - crate::CLAUDE_COST_HISTORY_MS;
     let mut claude_costs: Vec<(i64, f64)> = claude_recs
         .iter()
         .filter(|(ts, _, _)| *ts >= since)

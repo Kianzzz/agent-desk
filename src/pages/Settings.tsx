@@ -109,11 +109,12 @@ export function SettingsPage() {
         <Item
           label="Claude 额度"
           desc={
-            bridge === "installed"
-              ? "已接入 Claude Code 状态栏。在终端里用 Claude Code 时，5 小时和每周额度会自动更新；你原来的状态栏显示不变。断开会把原来的设置放回去。"
+            "Claude 桌面版开着时会定时记下官方的 5 小时和每周额度，自动读取，不需要设置。" +
+            (bridge === "installed"
+              ? "另外已接入 Claude Code 状态栏：在终端里用 Claude Code 时也会更新，两边取较新的；你原来的状态栏显示不变，断开会把原来的设置放回去。"
               : bridge === "broken"
                 ? "状态栏设置指向 Agent Desk，但脚本不见了，重新打开开关即可修复。"
-                : "接入后从 Claude Code 状态栏读取 5 小时和每周额度。会修改 ~/.claude/settings.json 的 statusLine（改前自动备份），原来的状态栏照常显示。"
+                : "只在终端里用 Claude Code 的话，打开这个开关从状态栏读取。会修改 ~/.claude/settings.json 的 statusLine（改前自动备份），原来的状态栏照常显示。")
           }
         >
           {bridgeBusy ? <Spinner size={14} /> : <Toggle on={bridge === "installed"} onChange={toggleBridge} />}

@@ -184,11 +184,15 @@ pub struct UsageSnapshot {
     pub sources: Vec<SourceStatus>,
     pub pricing_updated_at: Option<String>,
     pub unpriced_models: Vec<String>,
-    /// 最近 8 天每次 Claude 请求的（Unix 毫秒，折算美元），按时间升序、已去重。
+    /// 最近 [`CLAUDE_COST_HISTORY_MS`] 内每次 Claude 请求的（Unix 毫秒，折算美元），按时间升序、已去重。
     /// 只在进程内用（估算 Claude 额度），不序列化给界面。
     #[serde(skip)]
     pub claude_costs: Vec<(i64, f64)>,
 }
+
+/// `claude_costs` 保留多久。额度记录最多是 7 天前的，它所在的每周窗口又可能再早 7 天开始，
+/// 所以要 14 天以上才能覆盖整个窗口。
+pub const CLAUDE_COST_HISTORY_MS: i64 = 15 * 86_400_000;
 
 pub struct UsageEngine {
     home: PathBuf,
